@@ -27,6 +27,7 @@ Post-v2.4.0
    - Add support for connection tracking through the new "ct" action
      and "ct_state"/"ct_zone"/"ct_mark"/"ct_label" match fields.  Only
      available on Linux kernels with the connection tracking module loaded.
+   - Added multiqueue support to vhost-user
 
 
 v2.4.0 - 20 Aug 2015
