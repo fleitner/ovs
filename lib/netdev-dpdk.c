@@ -2850,21 +2850,13 @@ netdev_dpdk_pcap_dump(struct netdev_dpdk_pcap *pcap, struct dp_packet **pkts, in
     int i;
 
     for (i = 0; i < cnt; i++) {
-        int size = dp_packet_size(pkts[i]);
-
-        mbufs[newcnt] = rte_pktmbuf_alloc(pcap->dpdk_mp->mp);
+        mbufs[newcnt] = rte_pktmbuf_clone((struct rte_mbuf *)pkts[i],
+                                          pcap->dpdk_mp->mp);
 
         if (!mbufs[newcnt]) {
             dropped += cnt - i;
             break;
         }
-
-        /* We have to do a copy for now */
-        memcpy(rte_pktmbuf_mtod(mbufs[newcnt], void *),
-               dp_packet_data(pkts[i]), size);
-
-        rte_pktmbuf_data_len(mbufs[newcnt]) = size;
-        rte_pktmbuf_pkt_len(mbufs[newcnt]) = size;
 
         newcnt++;
     }
