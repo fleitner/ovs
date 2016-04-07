@@ -300,6 +300,7 @@ struct netdev_dpdk_pcap {
     struct dpdk_mp *dpdk_mp;
     /* struct rte_mbuf *mbufs[PCAP_RING_SIZE - 1];  pre-allocate? */
     char pcap_dumper[NAME_MAX];
+    int thread_running;
 };
 
 struct netdev_dpdk {
@@ -347,7 +348,9 @@ struct netdev_dpdk {
     struct qos_conf *qos_conf;
     rte_spinlock_t qos_lock;
 
-    struct netdev_dpdk_pcap *pcap;
+    OVSRCU_TYPE(struct netdev_dpdk_pcap *) pcap_rx;
+    OVSRCU_TYPE(struct netdev_dpdk_pcap *) pcap_tx;
+    int pcap_thread;
 };
 
 struct netdev_rxq_dpdk {
@@ -363,7 +366,7 @@ struct virtio_net * netdev_dpdk_get_virtio(const struct netdev_dpdk *dev);
 
 static void netdev_dpdk_pcap_set(struct unixctl_conn *conn, int argc,
                      const char *argv[], void *aux OVS_UNUSED);
-static void netdev_dpdk_pcap_dump(struct netdev_dpdk *dev,
+static void netdev_dpdk_pcap_dump(struct netdev_dpdk_pcap *pcap,
                      struct dp_packet **pkts, int cnt);
 
 static bool
@@ -1208,6 +1211,7 @@ netdev_dpdk_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **packets,
     struct netdev_rxq_dpdk *rx = netdev_rxq_dpdk_cast(rxq_);
     struct netdev *netdev = rx->up.netdev;
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
+    struct netdev_dpdk_pcap *pcap;
     int nb_rx;
 
     /* There is only one tx queue for this core.  Do not flush other
@@ -1224,6 +1228,11 @@ netdev_dpdk_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet **packets,
                              NETDEV_MAX_BURST);
     if (!nb_rx) {
         return EAGAIN;
+    }
+
+    pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_rx);
+    if (OVS_UNLIKELY(pcap)) {
+        netdev_dpdk_pcap_dump(pcap, packets, nb_rx);
     }
 
     *c = nb_rx;
@@ -1550,10 +1559,13 @@ netdev_dpdk_eth_send(struct netdev *netdev, int qid,
                      struct dp_packet **pkts, int cnt, bool may_steal)
 {
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
+    struct netdev_dpdk_pcap *pcap;
 
-    if (OVS_UNLIKELY(dev->pcap)) {
-        netdev_dpdk_pcap_dump(dev, pkts, cnt);
+    pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_tx);
+    if (OVS_UNLIKELY(pcap)) {
+        netdev_dpdk_pcap_dump(pcap, pkts, cnt);
     }
+
     netdev_dpdk_send__(dev, qid, pkts, cnt, may_steal);
     return 0;
 }
@@ -2280,7 +2292,7 @@ dpdk_common_init(void)
                              netdev_dpdk_set_admin_state, NULL);
 
     unixctl_command_register("netdev-dpdk/set-pcap",
-                             "[netdev] [file]", 1, 2,
+                             "<netdev> tx|rx [file]", 2, 3,
                              netdev_dpdk_pcap_set, NULL);
 
 
@@ -2665,20 +2677,34 @@ static const struct dpdk_qos_ops egress_policer_ops = {
 static void *
 start_pcap_loop(void *arg)
 {
-    struct netdev_dpdk *dpdk_dev;
-    struct netdev_dpdk_pcap *pcap;
+    struct netdev_dpdk *dev;
+    struct netdev_dpdk_pcap *pcap_rx;
+    struct netdev_dpdk_pcap *pcap_tx;
     void *pkt;
 
     pthread_detach(pthread_self());
     ovsrcu_quiesce_start();
 
-    dpdk_dev = (struct netdev_dpdk *)arg;
+    dev = (struct netdev_dpdk *)arg;
+    while (1) {
+        pcap_tx = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_tx);
+        if (pcap_tx) {
+            if (!rte_ring_dequeue(pcap_tx->ring, &pkt)) {
+                /* dump to pcap file */
+                rte_pktmbuf_free((struct rte_mbuf *)pkt);
+             }
+        }
 
-    while (dpdk_dev->pcap) {
-        pcap = dpdk_dev->pcap;
+        pcap_rx = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_rx);
+        if (pcap_rx) {
+            if (!rte_ring_dequeue(pcap_rx->ring, &pkt)) {
+                /* dump to pcap file */
+                rte_pktmbuf_free((struct rte_mbuf *)pkt);
+             }
+        }
 
-        if (!rte_ring_dequeue(pcap->ring, &pkt)) {
-            rte_pktmbuf_free((struct rte_mbuf *)pkt);
+        if (!pcap_rx && !pcap_tx) {
+            break;
         }
     }
 
@@ -2686,11 +2712,24 @@ start_pcap_loop(void *arg)
 }
 
 static int
-netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *filename)
+netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *dir,
+                        const char *filename)
 {
     struct netdev_dpdk_pcap *pcap;
     struct rte_ring *ring;
+    char ring_name[32];
     uint32_t buf_size;
+
+    if (!strcmp(dir, "tx")) {
+        pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_tx);
+    }
+    else {
+        pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_rx);
+    }
+
+    if (pcap) {
+        return -1;
+    }
 
     if (!filename) {
         return -1;
@@ -2702,9 +2741,9 @@ netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *filename)
     pcap->dpdk_mp = dpdk_mp_get(dpdk_dev->socket_id,
                                 FRAME_LEN_TO_MTU(buf_size));
 
-    /* FIXME: ring's name after dev's name */
-    ring = rte_ring_create("pcap", PCAP_RING_SIZE, dpdk_dev->socket_id,
-                           RING_F_SP_ENQ|RING_F_SC_DEQ);
+    sprintf(ring_name, "pcap_%s_%s", dir, dpdk_dev->up.name);
+    ring = rte_ring_create(ring_name, PCAP_RING_SIZE, dpdk_dev->socket_id,
+                           RING_F_SC_DEQ);
 
     if (!ring) {
         dpdk_mp_put(pcap->dpdk_mp);
@@ -2713,47 +2752,66 @@ netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *filename)
     }
 
     pcap->ring = ring;
-    dpdk_dev->pcap = pcap;
+
+    if (!strcmp(dir, "tx")) {
+        ovsrcu_set(&dpdk_dev->pcap_tx, pcap);
+    }
+    else {
+        ovsrcu_set(&dpdk_dev->pcap_rx, pcap);
+    }
+
 
     return 0;
 }
 
-static void
-netdev_dpdk_pcap_disable(struct netdev_dpdk *dpdk_dev)
+static int
+netdev_dpdk_pcap_disable(struct netdev_dpdk *dpdk_dev, const char *dir)
 {
-    struct netdev_dpdk_pcap *pcap = dpdk_dev->pcap;
+    struct netdev_dpdk_pcap *pcap;
 
-    /* FIXME: sync with the thread */
-    dpdk_dev->pcap = NULL;
+    if (!strcmp(dir, "tx")) {
+        pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_tx);
+        ovsrcu_set(&dpdk_dev->pcap_tx, NULL);
+    }
+    else {
+        pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_rx);
+        ovsrcu_set(&dpdk_dev->pcap_rx, NULL);
+    }
+
+    if (!pcap) {
+        return -1;
+    }
 
     /* FIXME: free pending mbufs */
     rte_ring_free(pcap->ring);
     dpdk_mp_put(pcap->dpdk_mp);
     rte_free(pcap);
+
+    return 0;
 }
 
 static void
 netdev_dpdk_pcap_set(struct unixctl_conn *conn, int argc,
                      const char *argv[], void *aux OVS_UNUSED)
 {
+    int ret = -1;
 
-    if (argc > 2) {
+    if (argc > 3) {
         /* enable pcap dump */
         struct netdev *netdev = netdev_from_name(argv[1]);
         if (netdev && is_dpdk_class(netdev->netdev_class)) {
             struct netdev_dpdk *dpdk_dev = netdev_dpdk_cast(netdev);
 
             ovs_mutex_lock(&dpdk_dev->mutex);
-            if (dpdk_dev->pcap) {
-                ovs_mutex_unlock(&dpdk_dev->mutex);
-                unixctl_command_reply_error(conn, "pcap already enabled");
-                return;
-            }
-
             /* FIXME: hold a ref */
-            netdev_dpdk_pcap_enable(dpdk_dev, argv[2]);
+            ret = netdev_dpdk_pcap_enable(dpdk_dev, argv[2], argv[3]);
+            if (!ret && !dpdk_dev->pcap_thread) {
+                char buffer[32];
+                snprintf(buffer, 32, "pcap_%s_", netdev->name);
+                ovs_thread_create(buffer, start_pcap_loop, dpdk_dev);
+            }
+            dpdk_dev->pcap_thread++;
             ovs_mutex_unlock(&dpdk_dev->mutex);
-            ovs_thread_create("pcap_thread", start_pcap_loop, dpdk_dev);
             netdev_close(netdev);
         }
     }
@@ -2764,17 +2822,20 @@ netdev_dpdk_pcap_set(struct unixctl_conn *conn, int argc,
             struct netdev_dpdk *dpdk_dev = netdev_dpdk_cast(netdev);
 
             ovs_mutex_lock(&dpdk_dev->mutex);
-            netdev_dpdk_pcap_disable(dpdk_dev);
+            ret = netdev_dpdk_pcap_disable(dpdk_dev, argv[2]);
+            if (!ret) {
+                dpdk_dev->pcap_thread--;
+            }
             ovs_mutex_unlock(&dpdk_dev->mutex);
             netdev_close(netdev);
         }
     }
 
-    unixctl_command_reply(conn, "OK");
+    unixctl_command_reply(conn, ret ? "FAIL": "OK");
 }
 
 static void
-netdev_dpdk_pcap_dump(struct netdev_dpdk *dev, struct dp_packet **pkts, int cnt)
+netdev_dpdk_pcap_dump(struct netdev_dpdk_pcap *pcap, struct dp_packet **pkts, int cnt)
     OVS_NO_THREAD_SAFETY_ANALYSIS
 {
 #if !defined(__CHECKER__) && !defined(_WIN32)
@@ -2783,7 +2844,6 @@ netdev_dpdk_pcap_dump(struct netdev_dpdk *dev, struct dp_packet **pkts, int cnt)
     /* Sparse or MSVC doesn't like variable length array. */
     enum { PKT_ARRAY_SIZE = NETDEV_MAX_BURST };
 #endif
-    struct netdev_dpdk_pcap *pcap = dev->pcap;
     struct rte_mbuf *mbufs[PKT_ARRAY_SIZE];
     int dropped = 0;
     int newcnt = 0;
