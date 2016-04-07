@@ -294,11 +294,11 @@ struct dpdk_ring {
     struct ovs_list list_node OVS_GUARDED_BY(dpdk_mutex);
 };
 
-#define PCAP_RING_SIZE 1024
+#define PCAP_RING_SIZE 256
 struct netdev_dpdk_pcap {
-    struct rte_ring *ring;
+    struct rte_ring *ravail;
+    struct rte_ring *rused;
     struct dpdk_mp *dpdk_mp;
-    /* struct rte_mbuf *mbufs[PCAP_RING_SIZE - 1];  pre-allocate? */
     char pcap_dumper[NAME_MAX];
     int thread_running;
 };
@@ -2689,17 +2689,17 @@ start_pcap_loop(void *arg)
     while (1) {
         pcap_tx = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_tx);
         if (pcap_tx) {
-            if (!rte_ring_dequeue(pcap_tx->ring, &pkt)) {
+            if (!rte_ring_dequeue(pcap_tx->rused, &pkt)) {
                 /* dump to pcap file */
-                rte_pktmbuf_free((struct rte_mbuf *)pkt);
+                rte_ring_enqueue(pcap_tx->ravail, &pkt);
              }
         }
 
         pcap_rx = ovsrcu_get(struct netdev_dpdk_pcap *, &dev->pcap_rx);
         if (pcap_rx) {
-            if (!rte_ring_dequeue(pcap_rx->ring, &pkt)) {
+            if (!rte_ring_dequeue(pcap_rx->rused, &pkt)) {
                 /* dump to pcap file */
-                rte_pktmbuf_free((struct rte_mbuf *)pkt);
+                rte_ring_enqueue(pcap_rx->ravail, &pkt);
              }
         }
 
@@ -2717,8 +2717,10 @@ netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *dir,
 {
     struct netdev_dpdk_pcap *pcap;
     struct rte_ring *ring;
+    struct rte_mbuf *pkt;
     char ring_name[32];
     uint32_t buf_size;
+    int i;
 
     if (!strcmp(dir, "tx")) {
         pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_tx);
@@ -2741,17 +2743,35 @@ netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *dir,
     pcap->dpdk_mp = dpdk_mp_get(dpdk_dev->socket_id,
                                 FRAME_LEN_TO_MTU(buf_size));
 
-    sprintf(ring_name, "pcap_%s_%s", dir, dpdk_dev->up.name);
+    sprintf(ring_name, "pcap_avail_%s_%s", dir, dpdk_dev->up.name);
     ring = rte_ring_create(ring_name, PCAP_RING_SIZE, dpdk_dev->socket_id,
                            RING_F_SC_DEQ);
 
     if (!ring) {
-        dpdk_mp_put(pcap->dpdk_mp);
-        rte_free(pcap);
-        return -1;
+        goto err_avail;
     }
 
-    pcap->ring = ring;
+    pcap->ravail = ring;
+
+    sprintf(ring_name, "pcap_used_%s_%s", dir, dpdk_dev->up.name);
+    ring = rte_ring_create(ring_name, PCAP_RING_SIZE, dpdk_dev->socket_id,
+                           RING_F_SC_DEQ);
+
+    if (!ring) {
+        goto err_used;
+    }
+
+    pcap->rused = ring;
+
+    for (i = 0; i < PCAP_RING_SIZE; i++ ) {
+        pkt = rte_pktmbuf_alloc(pcap->dpdk_mp->mp);
+        if (!pkt) {
+            /* FIXME: leaking allocated mbufs */
+            goto err_mbuf;
+        }
+
+        rte_ring_enqueue(ring, (void *)pkt);
+    }
 
     if (!strcmp(dir, "tx")) {
         ovsrcu_set(&dpdk_dev->pcap_tx, pcap);
@@ -2762,13 +2782,24 @@ netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *dir,
 
 
     return 0;
+
+err_mbuf:
+    rte_ring_free(pcap->rused);
+err_used:
+    rte_ring_free(pcap->ravail);
+err_avail:
+    dpdk_mp_put(pcap->dpdk_mp);
+    rte_free(pcap);
+    return -1;
 }
 
 static int
 netdev_dpdk_pcap_disable(struct netdev_dpdk *dpdk_dev, const char *dir)
 {
     struct netdev_dpdk_pcap *pcap;
+    void *pkt;
 
+    /* FIXME: race with pcap_dump thread */
     if (!strcmp(dir, "tx")) {
         pcap = ovsrcu_get(struct netdev_dpdk_pcap *, &dpdk_dev->pcap_tx);
         ovsrcu_set(&dpdk_dev->pcap_tx, NULL);
@@ -2782,8 +2813,20 @@ netdev_dpdk_pcap_disable(struct netdev_dpdk *dpdk_dev, const char *dir)
         return -1;
     }
 
-    /* FIXME: free pending mbufs */
-    rte_ring_free(pcap->ring);
+    while (!rte_ring_empty(pcap->rused)) {
+        if (!rte_ring_dequeue(pcap->rused, &pkt)) {
+            rte_pktmbuf_free((struct rte_mbuf *)pkt);
+        }
+    }
+
+    while (!rte_ring_empty(pcap->ravail)) {
+        if (!rte_ring_dequeue(pcap->ravail, &pkt)) {
+            rte_pktmbuf_free((struct rte_mbuf *)pkt);
+        }
+    }
+
+    rte_ring_free(pcap->rused);
+    rte_ring_free(pcap->ravail);
     dpdk_mp_put(pcap->dpdk_mp);
     rte_free(pcap);
 
@@ -2845,31 +2888,23 @@ netdev_dpdk_pcap_dump(struct netdev_dpdk_pcap *pcap, struct dp_packet **pkts, in
     enum { PKT_ARRAY_SIZE = NETDEV_MAX_BURST };
 #endif
     struct rte_mbuf *mbufs[PKT_ARRAY_SIZE];
-    int dropped = 0;
-    int newcnt = 0;
+    int newcnt;
     int i;
 
-    for (i = 0; i < cnt; i++) {
+    newcnt = rte_ring_dequeue_burst(pcap->ravail, (void **)&mbufs, cnt);
+
+    for (i = 0; i < newcnt; i++) {
         int size = dp_packet_size(pkts[i]);
 
-        mbufs[newcnt] = rte_pktmbuf_alloc(pcap->dpdk_mp->mp);
-
-        if (!mbufs[newcnt]) {
-            dropped += cnt - i;
-            break;
-        }
-
         /* We have to do a copy for now */
-        memcpy(rte_pktmbuf_mtod(mbufs[newcnt], void *),
+        memcpy(rte_pktmbuf_mtod(mbufs[i], void *),
                dp_packet_data(pkts[i]), size);
 
-        rte_pktmbuf_data_len(mbufs[newcnt]) = size;
-        rte_pktmbuf_pkt_len(mbufs[newcnt]) = size;
-
-        newcnt++;
+        rte_pktmbuf_data_len(mbufs[i]) = size;
+        rte_pktmbuf_pkt_len(mbufs[i]) = size;
     }
 
-    rte_ring_enqueue_burst(pcap->ring, (void *)mbufs, newcnt);
+    rte_ring_enqueue_burst(pcap->rused, (void *)mbufs, newcnt);
 }
 
 
