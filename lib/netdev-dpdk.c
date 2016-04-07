@@ -294,6 +294,14 @@ struct dpdk_ring {
     struct ovs_list list_node OVS_GUARDED_BY(dpdk_mutex);
 };
 
+#define PCAP_RING_SIZE 1024
+struct netdev_dpdk_pcap {
+    struct rte_ring *ring;
+    struct dpdk_mp *dpdk_mp;
+    /* struct rte_mbuf *mbufs[PCAP_RING_SIZE - 1];  pre-allocate? */
+    char pcap_dumper[NAME_MAX];
+};
+
 struct netdev_dpdk {
     struct netdev up;
     int port_id;
@@ -339,6 +347,7 @@ struct netdev_dpdk {
     struct qos_conf *qos_conf;
     rte_spinlock_t qos_lock;
 
+    struct netdev_dpdk_pcap *pcap;
 };
 
 struct netdev_rxq_dpdk {
@@ -351,6 +360,11 @@ static bool dpdk_thread_is_pmd(void);
 static int netdev_dpdk_construct(struct netdev *);
 
 struct virtio_net * netdev_dpdk_get_virtio(const struct netdev_dpdk *dev);
+
+static void netdev_dpdk_pcap_set(struct unixctl_conn *conn, int argc,
+                     const char *argv[], void *aux OVS_UNUSED);
+static void netdev_dpdk_pcap_dump(struct netdev_dpdk *dev,
+                     struct dp_packet **pkts, int cnt);
 
 static bool
 is_dpdk_class(const struct netdev_class *class)
@@ -1537,6 +1551,9 @@ netdev_dpdk_eth_send(struct netdev *netdev, int qid,
 {
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
 
+    if (OVS_UNLIKELY(dev->pcap)) {
+        netdev_dpdk_pcap_dump(dev, pkts, cnt);
+    }
     netdev_dpdk_send__(dev, qid, pkts, cnt, may_steal);
     return 0;
 }
@@ -2262,6 +2279,11 @@ dpdk_common_init(void)
                              "[netdev] up|down", 1, 2,
                              netdev_dpdk_set_admin_state, NULL);
 
+    unixctl_command_register("netdev-dpdk/set-pcap",
+                             "[netdev] [file]", 1, 2,
+                             netdev_dpdk_pcap_set, NULL);
+
+
     ovs_thread_create("dpdk_watchdog", dpdk_watchdog, NULL);
 }
 
@@ -2639,6 +2661,157 @@ static const struct dpdk_qos_ops egress_policer_ops = {
     egress_policer_qos_set,
     egress_policer_run
 };
+
+static void *
+start_pcap_loop(void *arg)
+{
+    struct netdev_dpdk *dpdk_dev;
+    struct netdev_dpdk_pcap *pcap;
+    void *pkt;
+
+    pthread_detach(pthread_self());
+    ovsrcu_quiesce_start();
+
+    dpdk_dev = (struct netdev_dpdk *)arg;
+
+    while (dpdk_dev->pcap) {
+        pcap = dpdk_dev->pcap;
+
+        if (!rte_ring_dequeue(pcap->ring, &pkt)) {
+            rte_pktmbuf_free((struct rte_mbuf *)pkt);
+        }
+    }
+
+    return NULL;
+}
+
+static int
+netdev_dpdk_pcap_enable(struct netdev_dpdk *dpdk_dev, const char *filename)
+{
+    struct netdev_dpdk_pcap *pcap;
+    struct rte_ring *ring;
+    uint32_t buf_size;
+
+    if (!filename) {
+        return -1;
+    }
+
+    pcap = dpdk_rte_mzalloc(sizeof *pcap);
+
+    buf_size = dpdk_buf_size(dpdk_dev->mtu);
+    pcap->dpdk_mp = dpdk_mp_get(dpdk_dev->socket_id,
+                                FRAME_LEN_TO_MTU(buf_size));
+
+    /* FIXME: ring's name after dev's name */
+    ring = rte_ring_create("pcap", PCAP_RING_SIZE, dpdk_dev->socket_id,
+                           RING_F_SP_ENQ|RING_F_SC_DEQ);
+
+    if (!ring) {
+        dpdk_mp_put(pcap->dpdk_mp);
+        rte_free(pcap);
+        return -1;
+    }
+
+    pcap->ring = ring;
+    dpdk_dev->pcap = pcap;
+
+    return 0;
+}
+
+static void
+netdev_dpdk_pcap_disable(struct netdev_dpdk *dpdk_dev)
+{
+    struct netdev_dpdk_pcap *pcap = dpdk_dev->pcap;
+
+    /* FIXME: sync with the thread */
+    dpdk_dev->pcap = NULL;
+
+    /* FIXME: free pending mbufs */
+    rte_ring_free(pcap->ring);
+    dpdk_mp_put(pcap->dpdk_mp);
+    rte_free(pcap);
+}
+
+static void
+netdev_dpdk_pcap_set(struct unixctl_conn *conn, int argc,
+                     const char *argv[], void *aux OVS_UNUSED)
+{
+
+    if (argc > 2) {
+        /* enable pcap dump */
+        struct netdev *netdev = netdev_from_name(argv[1]);
+        if (netdev && is_dpdk_class(netdev->netdev_class)) {
+            struct netdev_dpdk *dpdk_dev = netdev_dpdk_cast(netdev);
+
+            ovs_mutex_lock(&dpdk_dev->mutex);
+            if (dpdk_dev->pcap) {
+                ovs_mutex_unlock(&dpdk_dev->mutex);
+                unixctl_command_reply_error(conn, "pcap already enabled");
+                return;
+            }
+
+            /* FIXME: hold a ref */
+            netdev_dpdk_pcap_enable(dpdk_dev, argv[2]);
+            ovs_mutex_unlock(&dpdk_dev->mutex);
+            ovs_thread_create("pcap_thread", start_pcap_loop, dpdk_dev);
+            netdev_close(netdev);
+        }
+    }
+    else {
+        /* disable pcap dump */
+        struct netdev *netdev = netdev_from_name(argv[1]);
+        if (netdev && is_dpdk_class(netdev->netdev_class)) {
+            struct netdev_dpdk *dpdk_dev = netdev_dpdk_cast(netdev);
+
+            ovs_mutex_lock(&dpdk_dev->mutex);
+            netdev_dpdk_pcap_disable(dpdk_dev);
+            ovs_mutex_unlock(&dpdk_dev->mutex);
+            netdev_close(netdev);
+        }
+    }
+
+    unixctl_command_reply(conn, "OK");
+}
+
+static void
+netdev_dpdk_pcap_dump(struct netdev_dpdk *dev, struct dp_packet **pkts, int cnt)
+    OVS_NO_THREAD_SAFETY_ANALYSIS
+{
+#if !defined(__CHECKER__) && !defined(_WIN32)
+    const size_t PKT_ARRAY_SIZE = cnt;
+#else
+    /* Sparse or MSVC doesn't like variable length array. */
+    enum { PKT_ARRAY_SIZE = NETDEV_MAX_BURST };
+#endif
+    struct netdev_dpdk_pcap *pcap = dev->pcap;
+    struct rte_mbuf *mbufs[PKT_ARRAY_SIZE];
+    int dropped = 0;
+    int newcnt = 0;
+    int i;
+
+    for (i = 0; i < cnt; i++) {
+        int size = dp_packet_size(pkts[i]);
+
+        mbufs[newcnt] = rte_pktmbuf_alloc(pcap->dpdk_mp->mp);
+
+        if (!mbufs[newcnt]) {
+            dropped += cnt - i;
+            break;
+        }
+
+        /* We have to do a copy for now */
+        memcpy(rte_pktmbuf_mtod(mbufs[newcnt], void *),
+               dp_packet_data(pkts[i]), size);
+
+        rte_pktmbuf_data_len(mbufs[newcnt]) = size;
+        rte_pktmbuf_pkt_len(mbufs[newcnt]) = size;
+
+        newcnt++;
+    }
+
+    rte_ring_enqueue_burst(pcap->ring, (void *)mbufs, newcnt);
+}
+
 
 #define NETDEV_DPDK_CLASS(NAME, INIT, CONSTRUCT, DESTRUCT, MULTIQ, SEND, \
     GET_CARRIER, GET_STATS, GET_FEATURES, GET_STATUS, RXQ_RECV)          \
