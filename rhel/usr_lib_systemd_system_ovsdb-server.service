@@ -1,0 +1,15 @@
+[Unit]
+Description=Open vSwitch Database Server
+Documentation=man:ovsdb-server
+After=syslog.target
+Wants=ovsdb-del-transient-ports.service
+
+[Service]
+Type=forking
+RuntimeDirectory=openvswitch
+RuntimeDirectoryMode=0755
+ExecStart=/usr/share/openvswitch/scripts/ovs-ctl start \
+          --no-ovs-vswitchd \
+          --system-id=random $OPTIONS
+ExecStop=/usr/share/openvswitch/scripts/ovs-ctl stop \
+          --no-ovs-vswitchd

@@ -187,7 +187,7 @@ install -d -m 0755 $RPM_BUILD_ROOT%{_sysconfdir}/openvswitch
 install -p -D -m 0644 \
         rhel/usr_share_openvswitch_scripts_systemd_sysconfig.template \
         $RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig/openvswitch
-for service in openvswitch openvswitch-nonetwork \
+for service in openvswitch ovsdb-server ovsdb-del-transient-ports \
 		ovn-controller ovn-controller-vtep ovn-northd; do
 	install -p -D -m 0644 \
 			rhel/usr_lib_systemd_system_${service}.service \
@@ -243,15 +243,15 @@ rm -f $RPM_BUILD_ROOT%{_bindir}/ovs-parse-backtrace \
 rm -rf $RPM_BUILD_ROOT
 
 %preun
-%if 0%{?systemd_preun:1}
-    %systemd_preun %{name}.service
-%else
-    if [ $1 -eq 0 ] ; then
-        # Package removal, not upgrade
-        /bin/systemctl --no-reload disable %{name}.service >/dev/null 2>&1 || :
-        /bin/systemctl stop %{name}.service >/dev/null 2>&1 || :
-    fi
-%endif
+if [ $1 -eq 0 ] ; then
+    # Package removal, not upgrade
+    # Stop ovs-vswitchd first
+    systemctl --no-reload disable openvswitch.service >/dev/null 2>&1 || :
+    systemctl stop openvswitch.service >/dev/null 2>&1 || :
+    # Stop ovsdb-server
+    systemctl --no-reload disable ovsdb-server.service >/dev/null 2>&1 || :
+    systemctl stop openvswitch.service >/dev/null 2>&1 || :
+fi
 
 %preun ovn-central
 %if 0%{?systemd_preun:1}
@@ -288,7 +288,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 %if 0%{?systemd_post:1}
-    %systemd_post %{name}.service
+    %systemd_post ovsdb-server.service
+    %systemd_post openvswitch.service
 %else
     # Package install, not upgrade
     if [ $1 -eq 1 ]; then
@@ -330,15 +331,16 @@ rm -rf $RPM_BUILD_ROOT
 /usr/sbin/semodule -i %{_datadir}/selinux/packages/%{name}/openvswitch-custom.pp &> /dev/null || :
 
 %postun
-%if 0%{?systemd_postun_with_restart:1}
-    %systemd_postun_with_restart %{name}.service
-%else
-    /bin/systemctl daemon-reload >/dev/null 2>&1 || :
-    if [ "$1" -ge "1" ] ; then
-    # Package upgrade, not uninstall
-        /bin/systemctl try-restart %{name}.service >/dev/null 2>&1 || :
+systemctl daemon-reload >/dev/null 2>&1 || :
+# Package upgrade, not uninstall
+if [ "$1" -ge "1" ] ; then
+    if systemctl --quiet is-active openvswitch; then
+        systemctl stop openvswitch.service >/dev/null 2>&1 || :
+        systemctl stop ovsdb-server.service >/dev/null 2>&1 || :
+        systemctl start ovsdb-server.service >/dev/null 2>&1 || :
+        systemctl start openvswitch.service >/dev/null 2>&1 || :
     fi
-%endif
+fi
 
 %postun ovn-central
 %if 0%{?systemd_postun_with_restart:1}
@@ -412,13 +414,15 @@ fi
 %config(noreplace) %{_sysconfdir}/sysconfig/openvswitch
 %config(noreplace) %{_sysconfdir}/logrotate.d/openvswitch
 %{_unitdir}/openvswitch.service
-%{_unitdir}/openvswitch-nonetwork.service
+%{_unitdir}/ovsdb-server.service
+%{_unitdir}/ovsdb-del-transient-ports.service
 %{_datadir}/openvswitch/scripts/openvswitch.init
 %{_sysconfdir}/sysconfig/network-scripts/ifup-ovs
 %{_sysconfdir}/sysconfig/network-scripts/ifdown-ovs
 %{_datadir}/openvswitch/bugtool-plugins/
 %{_datadir}/openvswitch/scripts/ovs-bugtool-*
 %{_datadir}/openvswitch/scripts/ovs-check-dead-ifs
+%{_datadir}/openvswitch/scripts/ovsdb-del-transient-ports
 %{_datadir}/openvswitch/scripts/ovs-lib
 %{_datadir}/openvswitch/scripts/ovs-save
 %{_datadir}/openvswitch/scripts/ovs-vtep

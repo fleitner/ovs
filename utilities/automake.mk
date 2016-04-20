@@ -19,6 +19,7 @@ endif
 scripts_SCRIPTS += \
 	utilities/ovs-check-dead-ifs \
 	utilities/ovs-ctl \
+	utilities/ovsdb-del-transient-ports \
 	utilities/ovs-save
 scripts_DATA += utilities/ovs-lib
 
@@ -42,6 +43,7 @@ EXTRA_DIST += \
 	utilities/ovs-check-dead-ifs.in \
 	utilities/ovs-command-bashcomp.INSTALL.md \
 	utilities/ovs-ctl.in \
+	utilities/ovsdb-del-transient-ports \
 	utilities/ovs-dev.py \
 	utilities/ovs-docker \
 	utilities/ovs-dpctl-top.in \

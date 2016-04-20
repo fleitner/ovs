@@ -1,0 +1,11 @@
+[Unit]
+Description=Open vSwitch Database Transient Ports Removal
+Requires=ovsdb-server.service
+After=ovsdb-server.service
+Before=openvswitch.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/share/openvswitch/scripts/ovsdb-del-transient-ports \
+          --pidfile=/var/run/ovsdb-del-transient-ports.pid

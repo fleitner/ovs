@@ -1,13 +1,17 @@
 [Unit]
-Description=Open vSwitch
-After=syslog.target network.target openvswitch-nonetwork.service
-Requires=openvswitch-nonetwork.service
+Description=Open vSwitch Service
+Documentation=man:ovs-vswitchd
+Wants=network.target
+Requires=ovsdb-server.service
+After=ovsdb-server.service
 
 [Service]
-Type=oneshot
-ExecStart=/bin/true
-ExecStop=/bin/true
-RemainAfterExit=yes
-
+Type=forking
+EnvironmentFile=-/etc/sysconfig/openvswitch
+ExecStart=/usr/share/openvswitch/scripts/ovs-ctl start \
+          --no-ovsdb-server \
+          --system-id=random $OPTIONS
+ExecStop=/usr/share/openvswitch/scripts/ovs-ctl stop \
+          --no-ovsdb-server
 [Install]
 WantedBy=multi-user.target

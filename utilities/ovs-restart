@@ -1,0 +1,41 @@
+#!/bin/bash
+
+datadir="/usr/share/openvswitch"
+
+ovs_vsctl () {
+    ovs-vsctl --no-wait "$@"
+}
+
+ovs_save () {
+    bridges=`ovs_vsctl -- --real list-br`
+    if [ -n "${bridges}" ] && \
+        "$datadir/scripts/ovs-save" "$1" ${bridges} > "$2"; then
+        chmod +x "$2"
+        return 0
+    fi
+    [ -z "${bridges}" ] && return 0
+}
+
+
+script_flows=`mktemp`
+#trap 'rm -f "${script_flows}"' 0
+ovs_save save-flows "${script_flows}"
+systemctl stop ovsdb-server
+systemctl start ovsdb-server
+# stop ovs-vswitchd
+/usr/share/openvswitch/scripts/ovs-ctl stop --no-ovsdb-server
+ovs_vsctl set open_vswitch . other_config:flow-restore-wait="true"
+# start ovs-vswitchd
+/usr/share/openvswitch/scripts/ovs-ctl start \
+    --no-ovsdb-server \
+    --system-id=random $OPTIONS
+
+# Restore saved flows and inform vswitchd that we are done.
+# FIXME: action NORMAL remains
+/bin/sh ${script_flows}
+ovs_vsctl --if-exists remove open_vswitch . other_config \
+        flow-restore-wait="true"
+# FIXME: this should be here, but it's on ovsdb-server.service
+#ovs-appctl -t ovsdb-server ovsdb-server/add-remote \
+#    db:Open_vSwitch,Open_vSwitch,manager_options
+

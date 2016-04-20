@@ -1,0 +1,28 @@
+#!/bin/bash
+
+PIDFILE="/var/run/$(basename $0).pid"
+usage() {
+    cat <<EOF
+$0: Remove all transient ports from the OVS DB
+usage: $0 [OPTIONS]
+EOF
+}
+
+for arg
+do
+    case $arg in
+        --pidfile=*)
+            PIDFILE=`expr X"$arg" : 'X[^=]*=\(.*\)'`
+            ;;
+        *)
+        usage
+        exit 1
+    esac
+done
+
+if [ ! -f ${PIDFILE} ]; then
+    echo "$$" > ${PIDFILE} || exit 1
+    for port in `ovs-vsctl --bare -- --columns=name find port other_config:transient=true`; do
+        ovs_vsctl -- del-port "$port"
+    done
+fi
