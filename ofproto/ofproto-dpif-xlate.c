@@ -2770,6 +2770,9 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     } else if (xport->config & OFPUTIL_PC_NO_FWD) {
         xlate_report(ctx, "OFPPC_NO_FWD set, skipping output");
         return;
+    } else if (xport->config & OFPUTIL_PC_PORT_DOWN) {
+        xlate_report(ctx, "Port is administratively down, skipping output");
+        return;
     } else if (check_stp) {
         if (is_stp(&ctx->base_flow)) {
             if (!xport_stp_should_forward_bpdu(xport) &&
