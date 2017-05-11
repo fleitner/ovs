@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -607,7 +608,8 @@ nl_sock_send_seq(struct nl_sock *sock, const struct ofpbuf *msg,
 }
 
 static int
-nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
+nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, struct netns *ns,
+               bool wait)
 {
     /* We can't accurately predict the size of the data to be received.  The
      * caller is supposed to have allocated enough space in 'buf' to handle the
@@ -618,6 +620,8 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
     uint8_t tail[65536];
     struct iovec iov[2];
     struct msghdr msg;
+    uint8_t msgctrl[64];
+    struct cmsghdr *cmsg;
     ssize_t retval;
     int error;
 
@@ -632,6 +636,8 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
     memset(&msg, 0, sizeof msg);
     msg.msg_iov = iov;
     msg.msg_iovlen = 2;
+    msg.msg_control = msgctrl;
+    msg.msg_controllen = sizeof msgctrl;
 
     /* Receive a Netlink message from the kernel.
      *
@@ -706,6 +712,23 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
     }
 #endif
 
+    if (ns) {
+        /* The network namespace id comes as ancillary data. For older
+         * kernels, this data is either not available or it might be -1,
+         * so it falls back to local network namespace (no id). Latest
+         * kernels return a valid ID only if available or nothing. */
+        netns_set_local(ns);
+        cmsg = CMSG_FIRSTHDR(&msg);
+        while (cmsg != NULL) {
+            if (cmsg->cmsg_level == SOL_NETLINK
+                && cmsg->cmsg_type == NETLINK_LISTEN_ALL_NSID) {
+                int *id = ALIGNED_CAST(int *,  CMSG_DATA(cmsg));
+                netns_set_id(ns, *id);
+            }
+            cmsg = CMSG_NXTHDR(&msg, cmsg);
+        }
+    }
+
     log_nlmsg(__func__, 0, buf->data, buf->size, sock->protocol);
     COVERAGE_INC(netlink_received);
 
@@ -714,7 +737,8 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
 
 /* Tries to receive a Netlink message from the kernel on 'sock' into 'buf'.  If
  * 'wait' is true, waits for a message to be ready.  Otherwise, fails with
- * EAGAIN if the 'sock' receive buffer is empty.
+ * EAGAIN if the 'sock' receive buffer is empty.  If 'ns' is provided, the
+ * network namespace information will be provided.
  *
  * The caller must have initialized 'buf' with an allocation of at least
  * NLMSG_HDRLEN bytes.  For best performance, the caller should allocate enough
@@ -730,9 +754,10 @@ nl_sock_recv__(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
  * Regardless of success or failure, this function resets 'buf''s headroom to
  * 0. */
 int
-nl_sock_recv(struct nl_sock *sock, struct ofpbuf *buf, bool wait)
+nl_sock_recv(struct nl_sock *sock, struct ofpbuf *buf, struct netns *ns,
+             bool wait)
 {
-    return nl_sock_recv__(sock, buf, wait);
+    return nl_sock_recv__(sock, buf, ns, wait);
 }
 
 static void
@@ -821,7 +846,7 @@ nl_sock_transact_multiple__(struct nl_sock *sock,
         }
 
         /* Receive a reply. */
-        error = nl_sock_recv__(sock, buf_txn->reply, false);
+        error = nl_sock_recv__(sock, buf_txn->reply, NULL, false);
         if (error) {
             if (error == EAGAIN) {
                 nl_sock_record_errors__(transactions, n, 0);
@@ -1101,7 +1126,7 @@ nl_dump_refill(struct nl_dump *dump, struct ofpbuf *buffer)
     int error;
 
     while (!buffer->size) {
-        error = nl_sock_recv__(dump->sock, buffer, false);
+        error = nl_sock_recv__(dump->sock, buffer, NULL, false);
         if (error) {
             /* The kernel never blocks providing the results of a dump, so
              * error == EAGAIN means that we've read the whole thing, and
