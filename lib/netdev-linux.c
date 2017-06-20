@@ -573,7 +573,7 @@ netdev_rxq_linux_cast(const struct netdev_rxq *rx)
 }
 
 static int
-netdev_linux_netns_update(struct netdev_linux *netdev)
+netdev_linux_netns_update__(struct netdev_linux *netdev)
 {
     struct netns *dev_netns = &netdev->netns;
     struct dpif_netlink_vport reply;
@@ -591,7 +591,31 @@ netdev_linux_netns_update(struct netdev_linux *netdev)
     return 0;
 }
 
-static void netdev_linux_update(struct netdev_linux *netdev,
+static int
+netdev_linux_netns_update(struct netdev_linux *netdev)
+{
+    if (netns_is_invalid(&netdev->netns)) {
+        return netdev_linux_netns_update__(netdev);
+    }
+
+    return 0;
+}
+
+static bool
+netdev_linux_netns_is_remote(struct netdev_linux *netdev)
+{
+    netdev_linux_netns_update(netdev);
+    return netns_is_remote(&netdev->netns);
+}
+
+static bool
+netdev_linux_netns_is_eq(struct netdev_linux *netdev, struct netns *ns)
+{
+    netdev_linux_netns_update(netdev);
+    return netns_eq(&netdev->netns, ns);
+}
+
+static void netdev_linux_update(struct netdev_linux *netdev, struct netns *,
                                 const struct rtnetlink_change *)
     OVS_REQUIRES(netdev->mutex);
 static void netdev_linux_changed(struct netdev_linux *netdev,
@@ -655,10 +679,11 @@ netdev_linux_run(const struct netdev_class *netdev_class OVS_UNUSED)
     do {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
         uint64_t buf_stub[4096 / 8];
+        struct netns ns;
         struct ofpbuf buf;
 
         ofpbuf_use_stub(&buf, buf_stub, sizeof buf_stub);
-        error = nl_sock_recv(sock, &buf, NULL, false);
+        error = nl_sock_recv(sock, &buf, &ns, false);
         if (!error) {
             struct rtnetlink_change change;
 
@@ -677,7 +702,7 @@ netdev_linux_run(const struct netdev_class *netdev_class OVS_UNUSED)
                     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
 
                     ovs_mutex_lock(&netdev->mutex);
-                    netdev_linux_update(netdev, &change);
+                    netdev_linux_update(netdev, &ns, &change);
                     ovs_mutex_unlock(&netdev->mutex);
                 }
                 netdev_close(netdev_);
@@ -744,11 +769,11 @@ netdev_linux_changed(struct netdev_linux *dev,
 }
 
 static void
-netdev_linux_update(struct netdev_linux *dev,
-                    const struct rtnetlink_change *change)
+netdev_linux_update__(struct netdev_linux *dev,
+                      const struct rtnetlink_change *change)
     OVS_REQUIRES(dev->mutex)
 {
-    if (rtnetlink_type_is_rtnlgrp_link(change->nlmsg_type)){
+    if (rtnetlink_type_is_rtnlgrp_link(change->nlmsg_type)) {
         if (change->nlmsg_type == RTM_NEWLINK) {
             /* Keep drv-info, and ip addresses. */
             netdev_linux_changed(dev, change->ifi_flags,
@@ -772,12 +797,23 @@ netdev_linux_update(struct netdev_linux *dev,
             dev->get_ifindex_error = 0;
         } else {
             netdev_linux_changed(dev, change->ifi_flags, 0);
+            netns_set_invalid(&dev->netns);
         }
     } else if (rtnetlink_type_is_rtnlgrp_addr(change->nlmsg_type)) {
         /* Invalidates in4, in6. */
         netdev_linux_changed(dev, dev->ifi_flags, ~VALID_IN);
     } else {
         OVS_NOT_REACHED();
+    }
+}
+
+static void
+netdev_linux_update(struct netdev_linux *dev, struct netns *ns,
+                    const struct rtnetlink_change *change)
+    OVS_REQUIRES(dev->mutex)
+{
+    if (netdev_linux_netns_is_eq(dev, ns)) {
+        netdev_linux_update__(dev, change);
     }
 }
 
