@@ -788,6 +788,10 @@ netdev_linux_common_construct(struct netdev *netdev_)
         return EINVAL;
     }
 
+    /* The device could be in the same network namespace or in another one.
+     * Initialize as invalid to force a state update. */
+    netns_set_invalid(&netdev->netns);
+
     ovs_mutex_init(&netdev->mutex);
     return 0;
 }
