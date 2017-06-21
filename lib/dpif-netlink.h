@@ -21,6 +21,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "odp-netlink.h"
+#include "netns.h"
 
 #include "flow.h"
 
@@ -32,6 +33,7 @@ struct dpif_netlink_vport {
 
     /* ovs_vport header. */
     int dp_ifindex;
+    struct netns netns;
     odp_port_t port_no;                    /* ODPP_NONE if unknown. */
     enum ovs_vport_type type;
 

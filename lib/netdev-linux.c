@@ -476,6 +476,7 @@ struct netdev_linux {
     long long int miimon_interval;  /* Miimon Poll rate. Disabled if <= 0. */
     struct timer miimon_timer;
 
+    struct netns netns;         /* network namespace. */
     /* The following are figured out "on demand" only.  They are only valid
      * when the corresponding VALID_* bit in 'cache_valid' is set. */
     int ifindex;
@@ -571,6 +572,25 @@ netdev_rxq_linux_cast(const struct netdev_rxq *rx)
     return CONTAINER_OF(rx, struct netdev_rxq_linux, up);
 }
 
+static int
+netdev_linux_netns_update(struct netdev_linux *netdev)
+{
+    struct netns *dev_netns = &netdev->netns;
+    struct dpif_netlink_vport reply;
+    struct ofpbuf *buf;
+    int error;
+
+    error = dpif_netlink_vport_get(netdev_get_name(&netdev->up), &reply, &buf);
+    if (error) {
+        netns_set_invalid(dev_netns);
+        return error;
+    }
+
+    netns_copy(dev_netns, &reply.netns);
+    ofpbuf_delete(buf);
+    return 0;
+}
+
 static void netdev_linux_update(struct netdev_linux *netdev,
                                 const struct rtnetlink_change *)
     OVS_REQUIRES(netdev->mutex);
