@@ -974,20 +974,140 @@ dpdk_dev_parse_name(const char dev_name[], const char prefix[],
     }
 }
 
+static void
+netdev_dpdk_vhost_show__(struct ds *ds, struct netdev *netdev)
+{
+    struct netdev_dpdk *dpdk_dev = netdev_dpdk_cast(netdev);
+    bool client_mode = dpdk_dev->vhost_driver_flags & RTE_VHOST_USER_CLIENT;
+    struct rte_vhost_vring vring;
+    char socket_name[PATH_MAX];
+    uint64_t features;
+    uint16_t mtu;
+    int16_t vring_num;
+    int numa;
+    int vid;
+    int i;
+
+    vid = netdev_dpdk_get_vid(dpdk_dev);
+    ds_put_format(ds, "vhost-user port: %s\n", netdev->name);
+    ds_put_format(ds, "\tMode: %s\n", client_mode ? "client" : "server");
+    if (!rte_vhost_get_ifname(vid, socket_name, PATH_MAX)) {
+        ds_put_format(ds, "\tSocket: %s\n", socket_name);
+    }
+
+    if (vid == -1) {
+        ds_put_cstr(ds, "\tStatus: Disconnected\n");
+        return;
+    } else {
+        ds_put_cstr(ds, "\tStatus: Connected\n");
+    }
+
+    if (!rte_vhost_get_negotiated_features(vid, &features)) {
+        ds_put_format(ds, "\tNegotiated features: 0x%lx\n", features);
+    }
+
+    if (!rte_vhost_get_mtu(vid, &mtu)) {
+        ds_put_format(ds, "\tMTU: %d\n", mtu);
+    }
+
+    numa = rte_vhost_get_numa_node(vid);
+    if (numa != -1) {
+        ds_put_format(ds, "\tNUMA: %d\n", numa);
+    }
+
+    vring_num = rte_vhost_get_vring_num(vid);
+    if (vring_num) {
+        ds_put_format(ds, "\tNumber of vrings: %d\n", vring_num);
+    }
+
+    for (i = 0; i < vring_num; i++) {
+        rte_vhost_get_vhost_vring(vid, i, &vring);
+        ds_put_format(ds, "\tVring %d:\n", i);
+        ds_put_format(ds, "\t\tDescriptor length: %d\n",
+                      vring.desc->len);
+        ds_put_format(ds, "\t\tRing size: %d\n", vring.size);
+    }
+}
+
+
+static void
+netdev_dpdk_vhost_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
+                            const char *argv[], void *aux OVS_UNUSED)
+{
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    struct netdev_dpdk *dpdk_dev;
+
+    if (argc > 1) {
+        struct netdev *netdev = netdev_from_name(argv[1]);
+        if (!netdev) {
+            unixctl_command_reply_error(conn, "No such port");
+            return;
+        }
+
+        if (!is_dpdk_class(netdev->netdev_class)) {
+            netdev_close(netdev);
+            unixctl_command_reply_error(conn, "Not a vhost-user port");
+            return;
+        }
+
+        dpdk_dev = netdev_dpdk_cast(netdev);
+        ovs_mutex_lock(&dpdk_dev->mutex);
+        if (dpdk_dev->type != DPDK_DEV_VHOST) {
+            ovs_mutex_unlock(&dpdk_dev->mutex);
+            netdev_close(netdev);
+            unixctl_command_reply_error(conn, "Not a vhost-user port");
+            return;
+        }
+
+        netdev_dpdk_vhost_show__(&ds, netdev);
+        ovs_mutex_unlock(&dpdk_dev->mutex);
+        netdev_close(netdev);
+    } else {
+        ovs_mutex_lock(&dpdk_mutex);
+        LIST_FOR_EACH (dpdk_dev, list_node, &dpdk_list) {
+            ovs_mutex_lock(&dpdk_dev->mutex);
+            if (dpdk_dev->type != DPDK_DEV_VHOST) {
+                ovs_mutex_unlock(&dpdk_dev->mutex);
+                continue;
+            }
+
+            netdev_dpdk_vhost_show__(&ds, dpdk_dev);
+            ovs_mutex_unlock(&dpdk_dev->mutex);
+        }
+        ovs_mutex_unlock(&dpdk_mutex);
+    }
+
+    unixctl_command_reply(conn, ds_cstr(&ds));
+    ds_destroy(&ds);
+}
+
 static int
 vhost_common_construct(struct netdev *netdev)
     OVS_REQUIRES(dpdk_mutex)
 {
+    static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     int socket_id = rte_lcore_to_socket_id(rte_get_master_lcore());
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
+    int error;
 
     dev->tx_q = netdev_dpdk_alloc_txq(OVS_VHOST_MAX_QUEUE_NUM);
     if (!dev->tx_q) {
         return ENOMEM;
     }
 
-    return common_construct(netdev, DPDK_ETH_PORT_ID_INVALID,
-                            DPDK_DEV_VHOST, socket_id);
+    error = common_construct(netdev, DPDK_ETH_PORT_ID_INVALID,
+                             DPDK_DEV_VHOST, socket_id);
+    if (error) {
+        return error;
+    }
+
+    if (ovsthread_once_start(&once)) {
+        unixctl_command_register("vhostuser/show", "[port]", 0, 1,
+                                 netdev_dpdk_vhost_show, NULL);
+        ovsthread_once_done(&once);
+    }
+
+    return 0;
 }
 
 static int

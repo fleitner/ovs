@@ -156,6 +156,10 @@ event on all bridges.
 Displays detailed information about rapid spanning tree on the \fIbridge\fR.
 If \fIbridge\fR is not specified, then displays detailed information about all
 bridges with RSTP enabled.
+.IP "\fBvhostuser/show\fR [\fIport\fR]"
+Displays detailed internal information about a specific vhost-user \fIport\fR.
+If \fIport\fR is not specified, then displays detailed information about all
+vhost-user ports.
 .SS "BRIDGE COMMANDS"
 These commands manage bridges.
 .IP "\fBfdb/flush\fR [\fIbridge\fR]"
