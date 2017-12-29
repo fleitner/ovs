@@ -39,8 +39,8 @@ n_tables:254, n_buffers:0
 capabilities: FLOW_STATS TABLE_STATS PORT_STATS QUEUE_STATS ARP_MATCH_IP
 actions: output enqueue set_vlan_vid set_vlan_pcp strip_vlan mod_dl_src mod_dl_dst mod_nw_src mod_nw_dst mod_nw_tos mod_tp_src mod_tp_dst
  LOCAL(br0): addr:aa:55:aa:55:00:00
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max
 OFPT_GET_CONFIG_REPLY: frags=normal miss_send_len=0
 ])
@@ -61,16 +61,16 @@ n_tables:254, n_buffers:0
 capabilities: FLOW_STATS TABLE_STATS PORT_STATS QUEUE_STATS ARP_MATCH_IP
 actions: output enqueue set_vlan_vid set_vlan_pcp strip_vlan mod_dl_src mod_dl_dst mod_nw_src mod_nw_dst mod_nw_tos mod_tp_src mod_tp_dst
  1(p1): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max
  99(p2): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max
  LOCAL(br0): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max
 OFPT_GET_CONFIG_REPLY: frags=normal miss_send_len=0
 ])
@@ -123,8 +123,8 @@ AT_CHECK([ovs-ofctl -vwarn dump-ports-desc br0], [0], [stdout])
 AT_CHECK([strip_xids < stdout], [0], [dnl
 OFPST_PORT_DESC reply:
  LOCAL(br0): addr:aa:55:aa:55:00:00
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max
 ])
 OVS_VSWITCHD_STOP
@@ -138,8 +138,8 @@ AT_CHECK([ovs-ofctl -O OpenFlow12 -vwarn dump-ports-desc br0], [0], [stdout])
 AT_CHECK([strip_xids < stdout], [0], [dnl
 OFPST_PORT_DESC reply (OF1.2):
  LOCAL(br0): addr:aa:55:aa:55:00:00
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
 ])
 OVS_VSWITCHD_STOP
@@ -152,28 +152,28 @@ AT_CHECK([ovs-ofctl -F OXM-OpenFlow15 -O OpenFlow15 -vwarn dump-ports-desc br0],
 AT_CHECK([strip_xids < stdout | sed 's/00:0./00:0x/'], [0], [dnl
 OFPST_PORT_DESC reply (OF1.5):
  1(p1): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  2(p2): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  3(p3): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  LOCAL(br0): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
 ])
 AT_CHECK([ovs-ofctl -F OXM-OpenFlow15 -O OpenFlow15 -vwarn dump-ports-desc br0 2], [0], [stdout])
 AT_CHECK([strip_xids < stdout | sed 's/00:0./00:0x/'], [0], [dnl
 OFPST_PORT_DESC reply (OF1.5):
  2(p2): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
 ])
 OVS_VSWITCHD_STOP
@@ -186,28 +186,28 @@ AT_CHECK([ovs-ofctl -F OXM-OpenFlow16 -O OpenFlow16 -vwarn dump-ports-desc br0],
 AT_CHECK([strip_xids < stdout | sed 's/00:0./00:0x/'], [0], [dnl
 OFPST_PORT_DESC reply (OF1.6):
  1(p1): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  2(p2): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  3(p3): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
  LOCAL(br0): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
 ])
 AT_CHECK([ovs-ofctl -F OXM-OpenFlow16 -O OpenFlow16 -vwarn dump-ports-desc br0 2], [0], [stdout])
 AT_CHECK([strip_xids < stdout | sed 's/00:0./00:0x/'], [0], [dnl
 OFPST_PORT_DESC reply (OF1.6):
  2(p2): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max
 ])
 OVS_VSWITCHD_STOP
@@ -3191,6 +3191,7 @@ AT_CLEANUP
 
 AT_SETUP([ofproto - asynchronous message control (OpenFlow 1.0)])
 OVS_VSWITCHD_START
+ovs-ofctl mod-port br0 br0 down
 AT_CHECK([ovs-ofctl -P standard monitor br0 --detach --no-chdir --pidfile])
 check_async () {
     printf '\n\n--- check_async %d ---\n\n\n' $1
@@ -3225,8 +3226,12 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl add-port br0 test -- set Interface test type=dummy ofport_request=1
     if test X"$1" = X"OFPPR_ADD"; then shift;
         echo >>expout "OFPT_PORT_STATUS: ADD: 1(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
+     speed: 0 Mbps now, 0 Mbps max
+OFPT_PORT_STATUS: MOD: 1(test): addr:aa:55:aa:55:00:0x
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3234,8 +3239,8 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl del-port br0 test
     if test X"$1" = X"OFPPR_DELETE"; then shift;
         echo >>expout "OFPT_PORT_STATUS: DEL: 1(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3293,6 +3298,7 @@ AT_CLEANUP
 
 AT_SETUP([ofproto - asynchronous message control (OpenFlow 1.2)])
 OVS_VSWITCHD_START
+ovs-ofctl mod-port br0 br0 down
 AT_CHECK([ovs-ofctl -O OpenFlow12 -P standard monitor br0 --detach --no-chdir --pidfile])
 check_async () {
     printf '\n\n--- check_async %d ---\n\n\n' $1
@@ -3328,8 +3334,12 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl add-port br0 test -- set Interface test type=dummy
     if test X"$1" = X"OFPPR_ADD"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.2): ADD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
+     speed: 0 Mbps now, 0 Mbps max
+OFPT_PORT_STATUS (OF1.2): MOD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3337,8 +3347,8 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl del-port br0 test
     if test X"$1" = X"OFPPR_DELETE"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.2): DEL: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3398,6 +3408,8 @@ AT_SETUP([ofproto - asynchronous message control (OpenFlow 1.3)])
 OVS_VSWITCHD_START([dnl
     add-port br0 p1 -- set Interface p1 type=dummy ofport_request=10
 ])
+ovs-ofctl mod-port br0 br0 down
+ovs-ofctl mod-port br0 p1 down
 AT_CHECK([ovs-ofctl -O OpenFlow13 -P standard monitor br0 --detach --no-chdir --pidfile])
 check_async () {
     printf '\n\n--- check_async %d ---\n\n\n' $1
@@ -3438,8 +3450,12 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl add-port br0 test -- set Interface test type=dummy
     if test X"$1" = X"OFPPR_ADD"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.3): ADD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
+     speed: 0 Mbps now, 0 Mbps max
+OFPT_PORT_STATUS (OF1.3): MOD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3447,8 +3463,8 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl del-port br0 test
     if test X"$1" = X"OFPPR_DELETE"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.3): DEL: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3513,6 +3529,8 @@ AT_SETUP([ofproto - asynchronous message control (OpenFlow 1.4)])
 OVS_VSWITCHD_START([dnl
     add-port br0 p1 -- set Interface p1 type=dummy ofport_request=10
 ])
+ovs-ofctl mod-port br0 br0 down
+ovs-ofctl mod-port br0 p1 down
 AT_CHECK([ovs-ofctl -O OpenFlow14 -P standard monitor br0 --detach --no-chdir --pidfile])
 check_async () {
     printf '\n\n--- check_async %d ---\n\n\n' $1
@@ -3556,8 +3574,8 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-vsctl add-port br0 test -- set Interface test type=dummy
     if test X"$1" = X"OFPPR_ADD"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.4): ADD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3565,10 +3583,6 @@ udp,vlan_tci=0x0000,dl_src=00:26:b9:8c:b0:f9,dl_dst=00:25:83:df:b4:00,nw_src=172
     ovs-ofctl -O OpenFlow14 -vwarn mod-port br0 test up
     if test X"$1" = X"OFPPR_MODIFY"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.4): MOD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     0
-     state:      LINK_DOWN
-     speed: 0 Mbps now, 0 Mbps max
-OFPT_PORT_STATUS (OF1.4): MOD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
      config:     0
      state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
@@ -3720,6 +3734,7 @@ AT_CLEANUP
 
 AT_SETUP([ofproto - asynchronous message control (OpenFlow 1.5)])
 OVS_VSWITCHD_START
+ovs-ofctl mod-port br0 br0 down
 AT_CHECK([ovs-ofctl -O OpenFlow15 -P standard monitor br0 --detach --no-chdir --pidfile])
 check_async () {
     printf '\n\n--- check_async %d ---\n\n\n' $1
@@ -3737,8 +3752,8 @@ check_async () {
     ovs-vsctl add-port br0 test -- set Interface test type=dummy
     if test X"$1" = X"OFPPR_ADD"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.5): ADD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     PORT_DOWN
-     state:      LINK_DOWN
+     config:     0
+     state:      0
      speed: 0 Mbps now, 0 Mbps max"
     fi
 
@@ -3746,10 +3761,6 @@ check_async () {
     ovs-ofctl -O OpenFlow15 -vwarn mod-port br0 test up
     if test X"$1" = X"OFPPR_MODIFY"; then shift;
         echo >>expout "OFPT_PORT_STATUS (OF1.5): MOD: ${INDEX}(test): addr:aa:55:aa:55:00:0x
-     config:     0
-     state:      LINK_DOWN
-     speed: 0 Mbps now, 0 Mbps max
-OFPT_PORT_STATUS (OF1.5): MOD: 2(test): addr:aa:55:aa:55:00:0x
      config:     0
      state:      LIVE
      speed: 0 Mbps now, 0 Mbps max"
