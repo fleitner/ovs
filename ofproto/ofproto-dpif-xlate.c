@@ -3595,6 +3595,10 @@ check_output_prerequisites(struct xlate_ctx *ctx,
     if (!xport) {
         xlate_report(ctx, OFT_WARN, "Nonexistent output port");
         return false;
+    } else if (xport->config & OFPUTIL_PC_PORT_DOWN) {
+        xlate_report(ctx, OFT_WARN, "Port is administratively down, "
+                     "skipping output");
+        return false;
     } else if (xport->config & OFPUTIL_PC_NO_FWD) {
         xlate_report(ctx, OFT_DETAIL, "OFPPC_NO_FWD set, skipping output");
         return false;
