@@ -138,10 +138,11 @@ struct ofconn {
 
 /* vswitchd/ovs-vswitchd.8.in documents the value of BUNDLE_IDLE_LIFETIME in
  * seconds.  That documentation must be kept in sync with the value below. */
-enum {
-    BUNDLE_EXPIRY_INTERVAL = 1000,  /* Check bundle expiry every 1 sec. */
-    BUNDLE_IDLE_TIMEOUT = 10000,    /* Expire idle bundles after 10 seconds. */
-};
+#define BUNDLE_EXPIRY_INTERVAL 1000     /* Check bundle expiry every 1 sec. */
+#define BUNDLE_IDLE_TIMEOUT_DEFAULT 10000   /* Expire idle bundles after
+                                             * 10 seconds. */
+
+static int bundle_idle_timeout = BUNDLE_IDLE_TIMEOUT_DEFAULT;
 
 static struct ofconn *ofconn_create(struct connmgr *, struct rconn *,
                                     enum ofconn_type, bool enable_async_msgs)
@@ -468,6 +469,14 @@ struct ofproto *
 ofconn_get_ofproto(const struct ofconn *ofconn)
 {
     return ofconn->connmgr->ofproto;
+}
+
+void
+connmgr_set_bundle_idle_timeout(unsigned timeout) {
+    /* OpenFlow spec mandates the timeout to be at least one second. */
+    if (timeout > 0) {
+        bundle_idle_timeout = timeout * 1000;
+    }
 }
 
 /* OpenFlow configuration. */
@@ -1247,7 +1256,7 @@ static void
 bundle_remove_expired(struct ofconn *ofconn, long long int now)
 {
     struct ofp_bundle *b, *next;
-    long long int limit = now - BUNDLE_IDLE_TIMEOUT;
+    long long int limit = now - bundle_idle_timeout;
 
     HMAP_FOR_EACH_SAFE (b, next, node, &ofconn->bundles) {
         if (b->used <= limit) {
