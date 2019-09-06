@@ -323,8 +323,11 @@ static struct ovs_mutex dpdk_mp_mutex OVS_ACQ_AFTER(dpdk_mutex)
 static struct ovs_list dpdk_mp_list OVS_GUARDED_BY(dpdk_mp_mutex)
     = OVS_LIST_INITIALIZER(&dpdk_mp_list);
 
+static struct rte_mempool *shared_mp64k = NULL;
+
 struct dpdk_mp {
      struct rte_mempool *mp;
+     struct rte_mempool *mp64k;
      int mtu;
      int socket_id;
      int refcount;
@@ -638,6 +641,40 @@ dpdk_calculate_mbufs(struct netdev_dpdk *dev, int mtu, bool per_port_mp)
 }
 
 static struct dpdk_mp *
+dpdk_mp64k_create(uint32_t socket_id)
+{
+    struct rte_mempool *mp;
+    char name[] = "64k";
+    uint32_t n_mbufs;
+    uint32_t mbuf_priv_data_len;
+    uint32_t mbuf_size;
+    uint32_t aligned_mbuf_size = 0;
+    uint32_t pkt_size = 0;
+
+
+    /* 64k */
+    mbuf_size = 0xffff;
+    mbuf_priv_data_len = 584;
+    n_mbufs = 337;
+    mp = rte_pktmbuf_pool_create(name, n_mbufs, 0,
+                                          mbuf_priv_data_len,
+                                          mbuf_size,
+                                          socket_id);
+    if (mp) {
+        rte_mempool_obj_iter(mp, ovs_rte_pktmbuf_init, NULL);
+        VLOG_INFO("mempool of 64k mbufs allocated");
+    } else {
+        VLOG_ERR("Failed to create mempool mp_64k");
+        VLOG_ERR("mp_64k: size: %d entries: %d (%d bytes)", mbuf_size * n_mbufs,
+                 n_mbufs, mbuf_size);
+        VLOG_ERR("mp_64k: rte_errno=%d mbuf_priv_data_len=%d", rte_errno,
+                 mbuf_priv_data_len);
+    }
+
+    return mp;
+}
+
+static struct dpdk_mp *
 dpdk_mp_create(struct netdev_dpdk *dev, int mtu, bool per_port_mp)
 {
     char mp_name[RTE_MEMPOOL_NAMESIZE];
@@ -755,6 +792,11 @@ dpdk_mp_get(struct netdev_dpdk *dev, int mtu, bool per_port_mp)
     bool reuse = false;
 
     ovs_mutex_lock(&dpdk_mp_mutex);
+
+    if (!shared_mp64k) {
+        shared_mp64k = dpdk_mp64k_create(dev->requested_socket_id);
+    }
+
     /* Check if shared memory is being used, if so check existing mempools
      * to see if reuse is possible. */
     if (!per_port_mp) {
@@ -859,6 +901,7 @@ netdev_dpdk_mempool_configure(struct netdev_dpdk *dev)
             dpdk_mp_put(dev->dpdk_mp);
         }
         dev->dpdk_mp = dmp;
+        dev->dpdk_mp->mp64k = shared_mp64k;
         dev->mtu = dev->requested_mtu;
         dev->socket_id = dev->requested_socket_id;
         dev->max_packet_len = MTU_TO_FRAME_LEN(dev->mtu);
@@ -2214,6 +2257,7 @@ netdev_dpdk_vhost_rxq_recv(struct netdev_rxq *rxq,
     }
 
     nb_rx = rte_vhost_dequeue_burst(vid, qid, dev->dpdk_mp->mp,
+                                    dev->dpdk_mp->mp64k,
                                     (struct rte_mbuf **) batch->packets,
                                     NETDEV_MAX_BURST);
     if (!nb_rx) {
