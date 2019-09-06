@@ -109,6 +109,8 @@ static inline void dp_packet_set_size(struct dp_packet *, uint32_t);
 static inline uint16_t dp_packet_get_allocated(const struct dp_packet *);
 static inline void dp_packet_set_allocated(struct dp_packet *, uint16_t);
 
+static inline bool dp_packet_is_tso(struct dp_packet *b);
+
 void *dp_packet_resize_l2(struct dp_packet *, int increment);
 void *dp_packet_resize_l2_5(struct dp_packet *, int increment);
 static inline void *dp_packet_eth(const struct dp_packet *);
@@ -514,6 +516,14 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
     b->mbuf.buf_len = s;
 }
 
+static inline bool
+dp_packet_is_tso(struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK))
+           ? true
+           : false;
+}
+
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
  * correct only if 'dp_packet_rss_valid(p)' returns true */
 static inline uint32_t
@@ -641,6 +651,12 @@ static inline void
 dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 {
     b->allocated_ = s;
+}
+
+static inline bool
+dp_packet_is_tso(struct dp_packet *b OVS_UNUSED)
+{
+    return false;
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
