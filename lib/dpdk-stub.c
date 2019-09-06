@@ -68,6 +68,12 @@ dpdk_per_port_memory(void)
     return false;
 }
 
+bool
+tso_support(void)
+{
+    return false;
+}
+
 void
 print_dpdk_version(void)
 {
