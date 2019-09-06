@@ -55,6 +55,8 @@ static bool dpdk_initialized = false; /* Indicates successful initialization
                                        * of DPDK. */
 static bool per_port_memory = false; /* Status of per port memory support */
 
+static bool tso_support = false;      /* TSO support */
+
 static int
 process_vhost_flags(char *flag, const char *default_val, int size,
                     const struct smap *ovs_other_config,
@@ -329,6 +331,11 @@ dpdk_init__(const struct smap *ovs_other_config)
     VLOG_INFO("Per port memory for DPDK devices %s.",
               per_port_memory ? "enabled" : "disabled");
 
+    tso_support = smap_get_bool(ovs_other_config,
+                                    "tso-support", false);
+    VLOG_INFO("TSO support for vhost user client devices %s.",
+              tso_support ? "enabled" : "disabled");
+
     svec_add(&args, ovs_get_program_name());
     construct_dpdk_args(ovs_other_config, &args);
 
@@ -516,6 +523,12 @@ bool
 dpdk_per_port_memory(void)
 {
     return per_port_memory;
+}
+
+bool
+dpdk_tso_support(void)
+{
+    return tso_support;
 }
 
 void
