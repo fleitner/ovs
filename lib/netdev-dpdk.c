@@ -2294,6 +2294,24 @@ netdev_dpdk_vhost_update_rx_counters(struct netdev_stats *stats,
         }
 
         stats->rx_bytes += packet_size;
+#if 0
+        /* Debug/Tracing */
+        struct rte_mbuf *mbuf = (struct rte_mbuf *)packet;
+        int nb_segs = mbuf->nb_segs;
+        if (nb_segs == 1)
+                VLOG_INFO("single (root) size = %d, nb_segs = %d, max = %d",
+                          mbuf->pkt_len, nb_segs,
+                          rte_pktmbuf_data_room_size(mbuf->pool));
+        else
+                VLOG_INFO("chained (root) size = %d, nb_segs = %d, max = %d",
+                          mbuf->pkt_len, nb_segs,
+                          rte_pktmbuf_data_room_size(mbuf->pool));
+
+        for (int j = 1; j < nb_segs; j++) {
+                mbuf = mbuf->next;
+                VLOG_INFO("chained packet (%d) size = %d", j, mbuf->data_len);
+        }
+#endif
     }
 }
 
