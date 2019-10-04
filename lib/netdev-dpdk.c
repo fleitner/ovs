@@ -83,6 +83,11 @@ static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
  * The minimum mbuf size is limited to avoid scatter behaviour and drop in
  * performance for standard Ethernet MTU.
  */
+#define ETHER_HDR_LEN   RTE_ETHER_HDR_LEN
+#define ETHER_CRC_LEN   RTE_ETHER_CRC_LEN
+#define ETHER_MTU       RTE_ETHER_MTU
+#define ETHER_MIN_MTU   RTE_ETHER_MIN_MTU
+
 #define ETHER_HDR_MAX_LEN           (ETHER_HDR_LEN + ETHER_CRC_LEN \
                                      + (2 * VLAN_HEADER_LEN))
 #define MTU_TO_FRAME_LEN(mtu)       ((mtu) + ETHER_HDR_LEN + ETHER_CRC_LEN)
@@ -1042,7 +1047,7 @@ dpdk_eth_dev_init(struct netdev_dpdk *dev)
 {
     struct rte_pktmbuf_pool_private *mbp_priv;
     struct rte_eth_dev_info info;
-    struct ether_addr eth_addr;
+    struct rte_ether_addr eth_addr;
     int diag;
     int n_rxq, n_txq;
     uint32_t rx_chksm_offload_capa = DEV_RX_OFFLOAD_UDP_CKSUM |
@@ -1694,7 +1699,7 @@ netdev_dpdk_get_port_by_mac(const char *mac_str)
     }
 
     RTE_ETH_FOREACH_DEV (port_id) {
-        struct ether_addr ea;
+        struct rte_ether_addr ea;
 
         rte_eth_macaddr_get(port_id, &ea);
         memcpy(port_mac.ea, ea.addr_bytes, ETH_ADDR_LEN);
@@ -2077,10 +2082,10 @@ netdev_dpdk_policer_pkt_handle(struct rte_meter_srtcm *meter,
                                struct rte_meter_srtcm_profile *profile,
                                struct rte_mbuf *pkt, uint64_t time)
 {
-    uint32_t pkt_len = rte_pktmbuf_pkt_len(pkt) - sizeof(struct ether_hdr);
+    uint32_t pkt_len = rte_pktmbuf_pkt_len(pkt) - sizeof(struct rte_ether_hdr);
 
     return rte_meter_srtcm_color_blind_check(meter, profile, time, pkt_len) ==
-                                             e_RTE_METER_GREEN;
+                                             RTE_COLOR_GREEN;
 }
 
 static int
