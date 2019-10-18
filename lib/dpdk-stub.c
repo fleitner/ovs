@@ -69,7 +69,7 @@ dpdk_per_port_memory(void)
 }
 
 bool
-tso_support(void)
+dpdk_tso_support(void)
 {
     return false;
 }

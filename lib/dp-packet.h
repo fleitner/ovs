@@ -453,7 +453,7 @@ dp_packet_init_specific(struct dp_packet *p)
 {
     /* This initialization is needed for packets that do not come from DPDK
      * interfaces, when vswitchd is built with --with-dpdk. */
-    p->mbuf.tx_offload = p->mbuf.packet_type = 0;
+    p->mbuf.ol_flags = p->mbuf.tx_offload = p->mbuf.packet_type = 0;
     p->mbuf.nb_segs = 1;
     p->mbuf.next = NULL;
 }
