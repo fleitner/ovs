@@ -982,6 +982,14 @@ netdev_linux_construct_tap(struct netdev *netdev_)
         goto error_close;
     }
 
+    unsigned long offload = TUN_F_CSUM|TUN_F_TSO4|TUN_F_TSO6|TUN_F_TSO_ECN;
+    if (ioctl(netdev->tap_fd, TUNSETOFFLOAD, offload)) {
+        VLOG_WARN("%s: creating tap device failed (offload): %s", name,
+                  ovs_strerror(errno));
+        error = errno;
+        goto error_close;
+    }
+
     netdev->present = true;
     return 0;
 
