@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <linux/virtio_net.h>
+#include <linux/tcp.h>
 #include "dp-packet.h"
 #include "netdev-afxdp.h"
 #include "netdev-dpdk.h"
@@ -506,4 +508,27 @@ dp_packet_resize_l2(struct dp_packet *b, int increment)
     dp_packet_resize_l2_5(b, increment);
     dp_packet_adjust_layer_offset(&b->l2_5_ofs, increment);
     return dp_packet_data(b);
+}
+
+
+void
+dp_packet_insert_vnet(struct dp_packet *b)
+{
+    struct virtio_net_hdr *vnet;
+
+    vnet = dp_packet_push_zeros(b, sizeof(*vnet));
+    if (!dp_packet_is_tso(b)) {
+        vnet->flags = VIRTIO_NET_HDR_GSO_NONE;
+        return;
+    }
+
+    struct rte_mbuf *mbuf = &b->mbuf;
+    /* non-dpdk scenario? should be here? */
+    vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
+    vnet->csum_start = mbuf->l2_len + mbuf->l3_len;
+    vnet->csum_offset = __builtin_offsetof(struct tcphdr, check);
+    vnet->hdr_len = ETH_HLEN + sizeof(struct ip_header)
+                    + sizeof(struct tcp_header);
+    vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+    vnet->gso_size = mbuf->tso_segsz;
 }

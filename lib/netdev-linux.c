@@ -1324,6 +1324,7 @@ netdev_linux_sock_batch_send(int sock, int ifindex,
 
     struct dp_packet *packet;
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        dp_packet_insert_vnet(packet);
         iov[i].iov_base = dp_packet_data(packet);
         iov[i].iov_len = dp_packet_size(packet);
         mmsg[i].msg_hdr = (struct msghdr) { .msg_name = &sll,
@@ -6167,6 +6168,16 @@ af_packet_sock(void)
             if (error) {
                 close(sock);
                 sock = -error;
+            }
+
+            /* Check when this was included */
+            int val = 1;
+            error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val, sizeof(val));
+            if (error) {
+                VLOG_ERR("failed to enable vnet in raw socket: %s",
+                         ovs_strerror(errno));
+                close(sock);
+                sock = -errno;
             }
         } else {
             sock = -errno;
