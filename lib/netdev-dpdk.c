@@ -2595,6 +2595,7 @@ dpdk_copy_dp_packet_to_mbuf(struct rte_mempool *mp, struct dp_packet *pkt_orig)
     struct rte_mbuf *mbuf_dest;
     struct dp_packet *pkt_dest;
     uint32_t size;
+    uint32_t headroom;
 
     size = dp_packet_size(pkt_orig);
     mbuf_dest = dpdk_pktmbuf_alloc(mp, size);
@@ -2603,6 +2604,8 @@ dpdk_copy_dp_packet_to_mbuf(struct rte_mempool *mp, struct dp_packet *pkt_orig)
     }
 
     pkt_dest = CONTAINER_OF(mbuf_dest, struct dp_packet, mbuf);
+    headroom = dp_packet_headroom(pkt_orig);
+    dp_packet_set_data(pkt_dest, (char *)dp_packet_data(pkt_dest) + headroom);
     memcpy(dp_packet_data(pkt_dest), dp_packet_data(pkt_orig), size);
     dp_packet_set_size(pkt_dest, size);
 
