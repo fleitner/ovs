@@ -512,7 +512,7 @@ dp_packet_resize_l2(struct dp_packet *b, int increment)
 
 
 void
-dp_packet_insert_vnet(struct dp_packet *b)
+dp_packet_insert_vnet(struct dp_packet *b, int mtu)
 {
     struct virtio_net_hdr *vnet;
 
@@ -530,5 +530,5 @@ dp_packet_insert_vnet(struct dp_packet *b)
     vnet->hdr_len = ETH_HLEN + sizeof(struct ip_header)
                     + sizeof(struct tcp_header);
     vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
-    vnet->gso_size = mbuf->tso_segsz;
+    vnet->gso_size = mtu - vnet->hdr_len;
 }
