@@ -6172,7 +6172,6 @@ af_packet_sock(void)
                 sock = -error;
             }
 
-            /* Check when this was included */
             int val = 1;
             error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val, sizeof(val));
             if (error) {
