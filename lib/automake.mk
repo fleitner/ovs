@@ -304,6 +304,8 @@ lib_libopenvswitch_la_SOURCES = \
 	lib/tnl-neigh-cache.h \
 	lib/tnl-ports.c \
 	lib/tnl-ports.h \
+	lib/userspace-tso.c \
+	lib/userspace-tso.h \
 	lib/netdev-native-tnl.c \
 	lib/netdev-native-tnl.h \
 	lib/token-bucket.c \
