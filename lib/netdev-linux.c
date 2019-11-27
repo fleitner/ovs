@@ -1316,6 +1316,13 @@ netdev_linux_sock_batch_send(int sock, int ifindex,
 
     struct dp_packet *packet;
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        /* TSO not supported in TAP netdev */
+        if (dp_packet_is_tso(packet)) {
+            VLOG_WARN_RL(&rl, "Sock: Dropping unsupported TSO packet of size %"
+                         PRIuSIZE, size);
+            continue;
+        }
+
         iov[i].iov_base = dp_packet_data(packet);
         iov[i].iov_len = dp_packet_size(packet);
         mmsg[i].msg_hdr = (struct msghdr) { .msg_name = &sll,
@@ -1368,6 +1375,13 @@ netdev_linux_tap_batch_send(struct netdev *netdev_,
         size_t size = dp_packet_size(packet);
         ssize_t retval;
         int error;
+
+        /* TSO not supported in TAP netdev */
+        if (dp_packet_is_tso(packet)) {
+            VLOG_WARN_RL(&rl, "%s: Dropping unsupported TSO packet of size %"
+                         PRIuSIZE, netdev_get_name(netdev_), size);
+            continue;
+        }
 
         do {
             retval = write(netdev->tap_fd, dp_packet_data(packet), size);

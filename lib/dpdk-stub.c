@@ -74,6 +74,12 @@ dpdk_available(void)
     return false;
 }
 
+bool
+dpdk_tso_support(void)
+{
+    return false;
+}
+
 void
 print_dpdk_version(void)
 {

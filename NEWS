@@ -14,6 +14,7 @@ Post-v2.12.0
      * DPDK pdump packet capture support disabled by default. New configure
        option '--enable-dpdk-pdump' to enable it.
      * DPDK pdump support is deprecated and will be removed in next releases.
+     * Add experimental support for TSO.
 
 v2.12.0 - 03 Sep 2019
 ---------------------
