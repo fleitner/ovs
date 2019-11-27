@@ -1108,6 +1108,13 @@ netdev_dummy_send(struct netdev *netdev, int qid OVS_UNUSED,
         const void *buffer = dp_packet_data(packet);
         size_t size = dp_packet_size(packet);
 
+        /* TSO not supported in Dummy netdev */
+        if (dp_packet_is_tso(packet)) {
+            VLOG_WARN("%s: Dropping unsupported TSO packet of size %"PRIuSIZE,
+                      netdev_get_name(netdev), size);
+            continue;
+        }
+
         if (!dp_packet_is_eth(packet)) {
             error = EPFNOSUPPORT;
             break;

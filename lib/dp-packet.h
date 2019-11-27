@@ -109,6 +109,9 @@ static inline void dp_packet_set_size(struct dp_packet *, uint32_t);
 static inline uint16_t dp_packet_get_allocated(const struct dp_packet *);
 static inline void dp_packet_set_allocated(struct dp_packet *, uint16_t);
 
+static inline bool dp_packet_is_tso(struct dp_packet *b);
+static inline bool dp_packet_is_ipv4(struct dp_packet *b);
+
 void *dp_packet_resize_l2(struct dp_packet *, int increment);
 void *dp_packet_resize_l2_5(struct dp_packet *, int increment);
 static inline void *dp_packet_eth(const struct dp_packet *);
@@ -451,7 +454,7 @@ dp_packet_init_specific(struct dp_packet *p)
 {
     /* This initialization is needed for packets that do not come from DPDK
      * interfaces, when vswitchd is built with --with-dpdk. */
-    p->mbuf.tx_offload = p->mbuf.packet_type = 0;
+    p->mbuf.ol_flags = p->mbuf.tx_offload = p->mbuf.packet_type = 0;
     p->mbuf.nb_segs = 1;
     p->mbuf.next = NULL;
 }
@@ -514,6 +517,20 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
     b->mbuf.buf_len = s;
 }
 
+static inline bool
+dp_packet_is_tso(struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK))
+           ? true
+           : false;
+}
+
+static inline bool
+dp_packet_is_ipv4(struct dp_packet *b)
+{
+    return b->mbuf.ol_flags & PKT_TX_IPV4;
+}
+
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
  * correct only if 'dp_packet_rss_valid(p)' returns true */
 static inline uint32_t
@@ -544,8 +561,12 @@ dp_packet_reset_offload(struct dp_packet *p)
 static inline bool
 dp_packet_ip_checksum_valid(const struct dp_packet *p)
 {
-    return (p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
-            PKT_RX_IP_CKSUM_GOOD;
+    int ip_tso = (p->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM
+                    && (p->mbuf.ol_flags & PKT_TX_IPV4);
+    int ip_csum = (p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
+                     PKT_RX_IP_CKSUM_GOOD;
+
+    return ip_tso || ip_csum;
 }
 
 static inline bool
@@ -558,8 +579,9 @@ dp_packet_ip_checksum_bad(const struct dp_packet *p)
 static inline bool
 dp_packet_l4_checksum_valid(const struct dp_packet *p)
 {
-    return (p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
-            PKT_RX_L4_CKSUM_GOOD;
+    return ((p->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM)
+            || ((p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+                PKT_RX_L4_CKSUM_GOOD);
 }
 
 static inline bool
@@ -641,6 +663,18 @@ static inline void
 dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 {
     b->allocated_ = s;
+}
+
+static inline bool
+dp_packet_is_tso(struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+static inline bool
+dp_packet_is_ipv4(struct dp_packet *b OVS_UNUSED)
+{
+    return false;
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is

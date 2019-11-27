@@ -63,6 +63,7 @@
 #include "smap.h"
 #include "sset.h"
 #include "timeval.h"
+#include "tso.h"
 #include "unaligned.h"
 #include "unixctl.h"
 #include "util.h"
@@ -355,7 +356,8 @@ struct ingress_policer {
 enum dpdk_hw_ol_features {
     NETDEV_RX_CHECKSUM_OFFLOAD = 1 << 0,
     NETDEV_RX_HW_CRC_STRIP = 1 << 1,
-    NETDEV_RX_HW_SCATTER = 1 << 2
+    NETDEV_RX_HW_SCATTER = 1 << 2,
+    NETDEV_TX_TSO_OFFLOAD = 1 << 3,
 };
 
 /*
@@ -935,6 +937,12 @@ dpdk_eth_dev_port_config(struct netdev_dpdk *dev, int n_rxq, int n_txq)
         conf.rxmode.offloads |= DEV_RX_OFFLOAD_KEEP_CRC;
     }
 
+    if (dev->hw_ol_features & NETDEV_TX_TSO_OFFLOAD) {
+        conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
+        conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
+        conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+    }
+
     /* Limit configured rss hash functions to only those supported
      * by the eth device. */
     conf.rx_adv_conf.rss_conf.rss_hf &= info.flow_type_rss_offloads;
@@ -1036,6 +1044,9 @@ dpdk_eth_dev_init(struct netdev_dpdk *dev)
     uint32_t rx_chksm_offload_capa = DEV_RX_OFFLOAD_UDP_CKSUM |
                                      DEV_RX_OFFLOAD_TCP_CKSUM |
                                      DEV_RX_OFFLOAD_IPV4_CKSUM;
+    uint32_t tx_tso_offload_capa = DEV_TX_OFFLOAD_TCP_TSO |
+                                   DEV_TX_OFFLOAD_TCP_CKSUM |
+                                   DEV_TX_OFFLOAD_IPV4_CKSUM;
 
     rte_eth_dev_info_get(dev->port_id, &info);
 
@@ -1060,6 +1071,14 @@ dpdk_eth_dev_init(struct netdev_dpdk *dev)
     } else {
         /* Do not warn on lack of scatter support */
         dev->hw_ol_features &= ~NETDEV_RX_HW_SCATTER;
+    }
+
+    if (info.tx_offload_capa & tx_tso_offload_capa) {
+        dev->hw_ol_features |= NETDEV_TX_TSO_OFFLOAD;
+    } else {
+        dev->hw_ol_features &= ~NETDEV_TX_TSO_OFFLOAD;
+        VLOG_WARN("Tx TSO offload is not supported on port "
+                  DPDK_PORT_ID_FMT, dev->port_id);
     }
 
     n_rxq = MIN(info.max_rx_queues, dev->up.n_rxq);
@@ -1307,14 +1326,16 @@ netdev_dpdk_vhost_construct(struct netdev *netdev)
         goto out;
     }
 
-    err = rte_vhost_driver_disable_features(dev->vhost_id,
-                                1ULL << VIRTIO_NET_F_HOST_TSO4
-                                | 1ULL << VIRTIO_NET_F_HOST_TSO6
-                                | 1ULL << VIRTIO_NET_F_CSUM);
-    if (err) {
-        VLOG_ERR("rte_vhost_driver_disable_features failed for vhost user "
-                 "port: %s\n", name);
-        goto out;
+    if (!tso_enabled()) {
+        err = rte_vhost_driver_disable_features(dev->vhost_id,
+                                    1ULL << VIRTIO_NET_F_HOST_TSO4
+                                    | 1ULL << VIRTIO_NET_F_HOST_TSO6
+                                    | 1ULL << VIRTIO_NET_F_CSUM);
+        if (err) {
+            VLOG_ERR("rte_vhost_driver_disable_features failed for vhost user "
+                     "port: %s\n", name);
+            goto out;
+        }
     }
 
     err = rte_vhost_driver_start(dev->vhost_id);
@@ -1648,6 +1669,11 @@ netdev_dpdk_get_config(const struct netdev *netdev, struct smap *args)
             smap_add(args, "rx_csum_offload", "true");
         } else {
             smap_add(args, "rx_csum_offload", "false");
+        }
+        if (dev->hw_ol_features & NETDEV_TX_TSO_OFFLOAD) {
+            smap_add(args, "tx_tso_offload", "true");
+        } else {
+            smap_add(args, "tx_tso_offload", "false");
         }
         smap_add(args, "lsc_interrupt_mode",
                  dev->lsc_interrupt_mode ? "true" : "false");
@@ -2048,6 +2074,30 @@ netdev_dpdk_rxq_dealloc(struct netdev_rxq *rxq)
     rte_free(rx);
 }
 
+/* Prepare the packet for transmit TSO.
+ * It should be called only if PKT_TX_TCP_SEG is set in ol_flags.
+ * The flags PKT_TX_TCP_CKSUM and PKT_TX_IP_CKSUM are also set. */
+static void
+netdev_dpdk_prep_tso_packet(struct rte_mbuf *mbuf, int mtu)
+{
+    struct dp_packet *pkt = CONTAINER_OF(mbuf, struct dp_packet, mbuf);
+    struct tcp_header *th = dp_packet_l4(pkt);
+
+    mbuf->l2_len = (char *) dp_packet_l3(pkt) - (char *) dp_packet_eth(pkt);
+    mbuf->l3_len = (char *) dp_packet_l4(pkt) - (char *) dp_packet_l3(pkt);
+    /* There's no layer 4 in the packet. */
+    if (!th) {
+        VLOG_WARN_RL(&rl, "TSO packet without L4 header");
+        return;
+    }
+
+    mbuf->l4_len = TCP_OFFSET(th->tcp_ctl) * 4;
+    mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM;
+    mbuf->tso_segsz = mtu - mbuf->l3_len - mbuf->l4_len;
+    mbuf->outer_l2_len = 0;
+    mbuf->outer_l3_len = 0;
+}
+
 /* Tries to transmit 'pkts' to txq 'qid' of device 'dev'.  Takes ownership of
  * 'pkts', even in case of failure.
  *
@@ -2345,11 +2395,18 @@ netdev_dpdk_filter_packet_len(struct netdev_dpdk *dev, struct rte_mbuf **pkts,
     int cnt = 0;
     struct rte_mbuf *pkt;
 
+    /* Filter oversized packets, unless are marked for TSO. */
     for (i = 0; i < pkt_cnt; i++) {
         pkt = pkts[i];
-        if (OVS_UNLIKELY(pkt->pkt_len > dev->max_packet_len)) {
-            VLOG_WARN_RL(&rl, "%s: Too big size %" PRIu32 " max_packet_len %d",
-                         dev->up.name, pkt->pkt_len, dev->max_packet_len);
+        if ((pkt->ol_flags & PKT_TX_TCP_SEG)) {
+            /* vhost user client doesn't require 'pkt' to be prepared */
+            if (dev->type != DPDK_DEV_VHOST) {
+                netdev_dpdk_prep_tso_packet(pkt, dev->mtu);
+            }
+        } else if (OVS_UNLIKELY(pkt->pkt_len > dev->max_packet_len)) {
+            VLOG_WARN_RL(&rl, "%s: Too big size %" PRIu32 " "
+                         "max_packet_len %d", dev->up.name, pkt->pkt_len,
+                         dev->max_packet_len);
             rte_pktmbuf_free(pkt);
             continue;
         }
@@ -4303,6 +4360,11 @@ dpdk_vhost_reconfigure_helper(struct netdev_dpdk *dev)
         dev->tx_q[0].map = 0;
     }
 
+    if (tso_enabled()) {
+        dev->hw_ol_features |= NETDEV_TX_TSO_OFFLOAD;
+        VLOG_DBG("%s: TSO enabled on vhost port", dev->up.name);
+    }
+
     netdev_dpdk_remap_txqs(dev);
 
     err = netdev_dpdk_mempool_configure(dev);
@@ -4375,6 +4437,11 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
             vhost_flags |= RTE_VHOST_USER_DEQUEUE_ZERO_COPY;
         }
 
+        /* Enable External Buffers if TCP Segmentation Offload is enabled */
+        if (tso_enabled()) {
+            vhost_flags |= RTE_VHOST_USER_EXTBUF_SUPPORT;
+        }
+
         err = rte_vhost_driver_register(dev->vhost_id, vhost_flags);
         if (err) {
             VLOG_ERR("vhost-user device setup failure for device %s\n",
@@ -4399,14 +4466,16 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
             goto unlock;
         }
 
-        err = rte_vhost_driver_disable_features(dev->vhost_id,
-                                    1ULL << VIRTIO_NET_F_HOST_TSO4
-                                    | 1ULL << VIRTIO_NET_F_HOST_TSO6
-                                    | 1ULL << VIRTIO_NET_F_CSUM);
-        if (err) {
-            VLOG_ERR("rte_vhost_driver_disable_features failed for vhost user "
-                     "client port: %s\n", dev->up.name);
-            goto unlock;
+        if (!tso_enabled()) {
+            err = rte_vhost_driver_disable_features(dev->vhost_id,
+                                        1ULL << VIRTIO_NET_F_HOST_TSO4
+                                        | 1ULL << VIRTIO_NET_F_HOST_TSO6
+                                        | 1ULL << VIRTIO_NET_F_CSUM);
+            if (err) {
+                VLOG_ERR("rte_vhost_driver_disable_features failed for vhost user "
+                         "client port: %s\n", dev->up.name);
+                goto unlock;
+            }
         }
 
         err = rte_vhost_driver_start(dev->vhost_id);
