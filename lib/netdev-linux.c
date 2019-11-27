@@ -29,16 +29,17 @@
 #include <linux/filter.h>
 #include <linux/gen_stats.h>
 #include <linux/if_ether.h>
+#include <linux/if_packet.h>
 #include <linux/if_tun.h>
 #include <linux/types.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/rtnetlink.h>
 #include <linux/sockios.h>
+#include <linux/virtio_net.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
-#include <netpacket/packet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/route.h>
@@ -72,6 +73,7 @@
 #include "socket-util.h"
 #include "sset.h"
 #include "tc.h"
+#include "tso.h"
 #include "timer.h"
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
@@ -961,6 +963,10 @@ netdev_linux_construct_tap(struct netdev *netdev_)
     /* Create tap device. */
     get_flags(&netdev->up, &netdev->ifi_flags);
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+    if (tso_enabled()) {
+        ifr.ifr_flags |= IFF_VNET_HDR;
+    }
+
     ovs_strzcpy(ifr.ifr_name, name, sizeof ifr.ifr_name);
     if (ioctl(netdev->tap_fd, TUNSETIFF, &ifr) == -1) {
         VLOG_WARN("%s: creating tap device failed: %s", name,
@@ -1069,6 +1075,17 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             goto error;
         }
 
+        if (tso_enabled()) {
+            error = setsockopt(rx->fd, SOL_PACKET, PACKET_VNET_HDR, &val,
+                               sizeof val);
+            if (error) {
+                error = errno;
+                VLOG_ERR("%s: failed to enable vnet hdr in txq raw socket: %s",
+                         netdev_get_name(netdev_), ovs_strerror(errno));
+                goto error;
+            }
+        }
+
         /* Set non-blocking mode. */
         error = set_nonblocking(rx->fd);
         if (error) {
@@ -1150,6 +1167,7 @@ auxdata_has_vlan_tci(const struct tpacket_auxdata *aux)
 {
     return aux->tp_vlan_tci || aux->tp_status & TP_STATUS_VLAN_VALID;
 }
+
 
 static int
 netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
@@ -1245,6 +1263,7 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
     struct netdev_rxq_linux *rx = netdev_rxq_linux_cast(rxq_);
     struct netdev *netdev = rx->up.netdev;
     struct dp_packet *buffer;
+    size_t buffer_len;
     ssize_t retval;
     int mtu;
 
@@ -1252,9 +1271,13 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
         mtu = ETH_PAYLOAD_MAX;
     }
 
+    buffer_len = VLAN_ETH_HEADER_LEN + mtu;
+    if (tso_enabled()) {
+            buffer_len += sizeof(struct virtio_net_hdr);
+    }
+
     /* Assume Ethernet port. No need to set packet_type. */
-    buffer = dp_packet_new_with_headroom(VLAN_ETH_HEADER_LEN + mtu,
-                                           DP_NETDEV_HEADROOM);
+    buffer = dp_packet_new_with_headroom(buffer_len, DP_NETDEV_HEADROOM);
     retval = (rx->is_tap
               ? netdev_linux_rxq_recv_tap(rx->fd, buffer)
               : netdev_linux_rxq_recv_sock(rx->fd, buffer));
@@ -1266,6 +1289,10 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
         }
         dp_packet_delete(buffer);
     } else {
+        if (tso_enabled()) {
+            dp_packet_pull(buffer, sizeof(struct virtio_net_hdr));
+        }
+
         dp_packet_batch_init_packet(batch, buffer);
     }
 
@@ -1302,7 +1329,7 @@ netdev_linux_rxq_drain(struct netdev_rxq *rxq_)
 }
 
 static int
-netdev_linux_sock_batch_send(int sock, int ifindex,
+netdev_linux_sock_batch_send(int sock, int ifindex, bool tso, int mtu,
                              struct dp_packet_batch *batch)
 {
     const size_t size = dp_packet_batch_size(batch);
@@ -1316,6 +1343,10 @@ netdev_linux_sock_batch_send(int sock, int ifindex,
 
     struct dp_packet *packet;
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        if (tso) {
+            dp_packet_prepend_vnet_hdr(packet, mtu);
+        }
+
         iov[i].iov_base = dp_packet_data(packet);
         iov[i].iov_len = dp_packet_size(packet);
         mmsg[i].msg_hdr = (struct msghdr) { .msg_name = &sll,
@@ -1348,7 +1379,7 @@ netdev_linux_sock_batch_send(int sock, int ifindex,
  * on other interface types because we attach a socket filter to the rx
  * socket. */
 static int
-netdev_linux_tap_batch_send(struct netdev *netdev_,
+netdev_linux_tap_batch_send(struct netdev *netdev_, bool tso, int mtu,
                             struct dp_packet_batch *batch)
 {
     struct netdev_linux *netdev = netdev_linux_cast(netdev_);
@@ -1365,10 +1396,15 @@ netdev_linux_tap_batch_send(struct netdev *netdev_,
     }
 
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
-        size_t size = dp_packet_size(packet);
+        size_t size;
         ssize_t retval;
         int error;
 
+        if (tso) {
+            dp_packet_prepend_vnet_hdr(packet, mtu);
+        }
+
+        size = dp_packet_size(packet);
         do {
             retval = write(netdev->tap_fd, dp_packet_data(packet), size);
             error = retval < 0 ? errno : 0;
@@ -1403,8 +1439,14 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
                   struct dp_packet_batch *batch,
                   bool concurrent_txq OVS_UNUSED)
 {
+    bool tso = tso_enabled();
+    int mtu = ETH_PAYLOAD_MAX;
     int error = 0;
     int sock = 0;
+
+    if (tso) {
+        netdev_linux_get_mtu__(netdev_linux_cast(netdev_), &mtu);
+    }
 
     if (!is_tap_netdev(netdev_)) {
         if (netdev_linux_netnsid_is_remote(netdev_linux_cast(netdev_))) {
@@ -1424,9 +1466,9 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
             goto free_batch;
         }
 
-        error = netdev_linux_sock_batch_send(sock, ifindex, batch);
+        error = netdev_linux_sock_batch_send(sock, ifindex, tso, mtu, batch);
     } else {
-        error = netdev_linux_tap_batch_send(netdev_, batch);
+        error = netdev_linux_tap_batch_send(netdev_, tso, mtu, batch);
     }
     if (error) {
         if (error == ENOBUFS) {
@@ -6169,6 +6211,19 @@ af_packet_sock(void)
             if (error) {
                 close(sock);
                 sock = -error;
+            }
+
+            if (tso_enabled()) {
+                int val = 1;
+                error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val,
+                                   sizeof val);
+                if (error) {
+                    error = errno;
+                    VLOG_ERR("failed to enable vnet hdr in raw socket: %s",
+                             ovs_strerror(errno));
+                    close(sock);
+                    sock = -error;
+                }
             }
         } else {
             sock = -errno;

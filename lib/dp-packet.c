@@ -17,6 +17,7 @@
 #include <config.h>
 #include <stdlib.h>
 #include <string.h>
+#include <linux/virtio_net.h>
 
 #include "dp-packet.h"
 #include "netdev-afxdp.h"
@@ -509,3 +510,48 @@ dp_packet_resize_l2(struct dp_packet *b, int increment)
     dp_packet_adjust_layer_offset(&b->l2_5_ofs, increment);
     return dp_packet_data(b);
 }
+
+#ifdef DPDK_NETDEV
+void
+dp_packet_prepend_vnet_hdr(struct dp_packet *b, int mtu)
+{
+    struct virtio_net_hdr *vnet;
+    uint64_t ol_flags = b->mbuf.ol_flags;
+
+    vnet = dp_packet_push_zeros(b, sizeof *vnet);
+    if ((ol_flags & PKT_TX_TCP_SEG) && (dp_packet_size(b) > vnet->gso_size)) {
+
+        if (ol_flags & PKT_TX_IPV4) {
+            vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+            vnet->hdr_len = ETH_HLEN + IP_HEADER_LEN + TCP_HEADER_LEN;
+        } else {
+            vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
+            vnet->hdr_len = ETH_HLEN + IPV6_HEADER_LEN + TCP_HEADER_LEN;
+        }
+
+        vnet->gso_size = mtu - vnet->hdr_len;
+    } else {
+        vnet->flags = VIRTIO_NET_HDR_GSO_NONE;
+    }
+
+    uint64_t tx_l4_mask = ol_flags & PKT_TX_L4_MASK;
+    if (tx_l4_mask) {
+        vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
+        vnet->csum_start = (char *) dp_packet_l4(b) - (char *) dp_packet_eth(b);
+
+        if (tx_l4_mask == PKT_TX_TCP_CKSUM) {
+            vnet->csum_offset = __builtin_offsetof(struct tcp_header, tcp_csum);
+        } else if (tx_l4_mask == PKT_TX_UDP_CKSUM) {
+            vnet->csum_offset = __builtin_offsetof(struct udp_header, udp_csum);
+        } else if (tx_l4_mask == PKT_TX_SCTP_CKSUM) {
+            vnet->csum_offset = __builtin_offsetof(struct sctp_header,
+                                                   sctp_csum);
+        }
+    }
+}
+#else
+void
+dp_packet_prepend_vnet_hdr(struct dp_packet *b OVS_UNUSED, int mtu OVS_UNUSED)
+{
+}
+#endif
