@@ -456,7 +456,7 @@ dp_packet_init_specific(struct dp_packet *p)
 {
     /* This initialization is needed for packets that do not come from DPDK
      * interfaces, when vswitchd is built with --with-dpdk. */
-    p->mbuf.tx_offload = p->mbuf.packet_type = 0;
+    p->mbuf.ol_flags = p->mbuf.tx_offload = p->mbuf.packet_type = 0;
     p->mbuf.nb_segs = 1;
     p->mbuf.next = NULL;
 }
@@ -517,6 +517,96 @@ static inline void
 dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 {
     b->mbuf.buf_len = s;
+}
+
+/* Return true if packet 'b' offloads TCP segmentation. */
+static inline bool
+dp_packet_hwol_is_tso(const struct dp_packet *b)
+{
+    return !!(b->mbuf.ol_flags & PKT_TX_TCP_SEG);
+}
+
+/* Return true if packet 'b' is IPv4. The flag is required when
+ * offload is requested. */
+static inline bool
+dp_packet_hwol_is_ipv4(const struct dp_packet *b)
+{
+    return !!(b->mbuf.ol_flags & PKT_TX_IPV4);
+}
+
+/* Return the L4 cksum offload bitmask. */
+static inline uint64_t
+dp_packet_hwol_l4_mask(const struct dp_packet *b)
+{
+    return b->mbuf.ol_flags & PKT_TX_L4_MASK;
+}
+
+/* Return true if the packet 'b' offloads TCP checksum calculation. */
+static inline bool
+dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM;
+}
+
+/* Return true if the packet 'b' offloads UDP checksum calculation. */
+static inline bool
+dp_packet_hwol_l4_is_udp(struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_UDP_CKSUM;
+}
+
+/* Return true if the packet 'b' offloads SCTP checksum calculation. */
+static inline bool
+dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_SCTP_CKSUM;
+}
+
+/* Flag the packet 'b' as IPv4 necessary when offload is used. */
+static inline void
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_IPV4;
+}
+
+/* Flag the packet 'b' as IPv6 necessary when offload is used. */
+static inline void
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_IPV6;
+}
+
+/* Request TCP checksum offload for packet 'b'. It implies that
+ * either the packet 'b' is flagged as IPv4 or IPv6. */
+static inline void
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_TCP_CKSUM;
+}
+
+/* Request UDP checksum offload for packet 'b'. It implies that
+ * either the packet 'b' is flagged as IPv4 or IPv6. */
+static inline void
+dp_packet_hwol_set_csum_udp(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_UDP_CKSUM;
+}
+
+/* Request SCTP checksum offload for packet 'b'. It implies that
+ * either the packet 'b' is flagged as IPv4 or IPv6. */
+static inline void
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_SCTP_CKSUM;
+}
+
+/* Request TCP segmentation offload for packet 'b'. It implies that
+ * either the packet 'b' is flagged as IPv4 or IPv6 and also implies
+ * that TCP checksum offload is flagged. */
+static inline void
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= PKT_TX_TCP_SEG;
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
@@ -646,6 +736,84 @@ static inline void
 dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 {
     b->allocated_ = s;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_is_tso(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_is_ipv4(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline uint64_t
+dp_packet_hwol_l4_mask(const struct dp_packet *b OVS_UNUSED)
+{
+    return 0;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_l4_is_tcp(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_l4_is_udp(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_l4_is_sctp(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_csum_udp(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
@@ -937,6 +1105,22 @@ dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
         }
         batch->trunc = false;
     }
+}
+
+/* Return true if the packet 'b' requested IPv4 checksum offload. */
+static inline bool
+dp_packet_hwol_tx_ipv4_checksum(const struct dp_packet *b)
+{
+
+    return !!dp_packet_hwol_is_ipv4(b);
+}
+
+/* Return true if the packet 'b' requested L4 checksum offload. */
+static inline bool
+dp_packet_hwol_tx_l4_checksum(const struct dp_packet *b)
+{
+
+    return !!dp_packet_hwol_l4_mask(b);
 }
 
 #ifdef  __cplusplus
