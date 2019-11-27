@@ -4355,6 +4355,9 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
         /* Register client-mode device. */
         vhost_flags |= RTE_VHOST_USER_CLIENT;
 
+        /* There is no support for multi-segments buffers */
+        vhost_flags |= RTE_VHOST_USER_LINEARBUF_SUPPORT;
+
         /* Enable IOMMU support, if explicitly requested. */
         if (dpdk_vhost_iommu_enabled()) {
             vhost_flags |= RTE_VHOST_USER_IOMMU_SUPPORT;
