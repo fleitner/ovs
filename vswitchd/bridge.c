@@ -65,6 +65,7 @@
 #include "system-stats.h"
 #include "timeval.h"
 #include "tnl-ports.h"
+#include "tso.h"
 #include "util.h"
 #include "unixctl.h"
 #include "lib/vswitch-idl.h"
