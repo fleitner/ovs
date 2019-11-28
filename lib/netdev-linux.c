@@ -72,6 +72,7 @@
 #include "socket-util.h"
 #include "sset.h"
 #include "tc.h"
+#include "tso.h"
 #include "timer.h"
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
@@ -493,6 +494,13 @@ static int tc_calc_buffer(unsigned int Bps, int mtu, uint64_t burst_bytes);
  * additional log messages. */
 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
 
+struct netdev_linux_afpacket {
+    int sock;
+    int ifindex;
+    int mtu;
+    bool virtio_net_hdr;
+};
+
 /* Polling miimon status for all ports causes performance degradation when
  * handling a large number of ports. If there are no devices using miimon, then
  * we skip netdev_linux_miimon_run() and netdev_linux_miimon_wait().
@@ -514,7 +522,9 @@ static int do_set_addr(struct netdev *netdev,
                        struct in_addr addr);
 static int get_etheraddr(const char *netdev_name, struct eth_addr *ea);
 static int set_etheraddr(const char *netdev_name, const struct eth_addr);
-static int af_packet_sock(void);
+static int af_packet_sock(struct netdev_linux_afpacket *afpacket);
+static int netdev_linux_afpacket_sock(struct netdev *netdev_,
+                                      struct netdev_linux_afpacket *afpacket);
 static bool netdev_linux_miimon_enabled(void);
 static void netdev_linux_miimon_run(void);
 static void netdev_linux_miimon_wait(void);
@@ -1302,25 +1312,22 @@ netdev_linux_rxq_drain(struct netdev_rxq *rxq_)
 }
 
 static int
-netdev_linux_sock_batch_send(int sock, int ifindex,
+netdev_linux_sock_batch_send(struct netdev_linux_afpacket *afpacket,
                              struct dp_packet_batch *batch)
 {
     const size_t size = dp_packet_batch_size(batch);
     /* We don't bother setting most fields in sockaddr_ll because the
      * kernel ignores them for SOCK_RAW. */
     struct sockaddr_ll sll = { .sll_family = AF_PACKET,
-                               .sll_ifindex = ifindex };
+                               .sll_ifindex = afpacket->ifindex };
 
     struct mmsghdr *mmsg = xmalloc(sizeof(*mmsg) * size);
     struct iovec *iov = xmalloc(sizeof(*iov) * size);
 
     struct dp_packet *packet;
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
-        /* TSO not supported in TAP netdev */
-        if (dp_packet_is_tso(packet)) {
-            VLOG_WARN_RL(&rl, "Sock: Dropping unsupported TSO packet of size %"
-                         PRIuSIZE, size);
-            continue;
+        if (afpacket->virtio_net_hdr) {
+            dp_packet_insert_vnet(packet, afpacket->mtu);
         }
 
         iov[i].iov_base = dp_packet_data(packet);
@@ -1335,7 +1342,7 @@ netdev_linux_sock_batch_send(int sock, int ifindex,
     for (uint32_t ofs = 0; ofs < size; ) {
         ssize_t retval;
         do {
-            retval = sendmmsg(sock, mmsg + ofs, size - ofs, 0);
+            retval = sendmmsg(afpacket->sock, mmsg + ofs, size - ofs, 0);
             error = retval < 0 ? errno : 0;
         } while (error == EINTR);
         if (error) {
@@ -1418,27 +1425,21 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
                   bool concurrent_txq OVS_UNUSED)
 {
     int error = 0;
-    int sock = 0;
 
     if (!is_tap_netdev(netdev_)) {
+        struct netdev_linux_afpacket afpacket;
+
         if (netdev_linux_netnsid_is_remote(netdev_linux_cast(netdev_))) {
             error = EOPNOTSUPP;
             goto free_batch;
         }
 
-        sock = af_packet_sock();
-        if (sock < 0) {
-            error = -sock;
+        error = netdev_linux_afpacket_sock(netdev_, &afpacket);
+        if (error < 0) {
             goto free_batch;
         }
 
-        int ifindex = netdev_get_ifindex(netdev_);
-        if (ifindex < 0) {
-            error = -ifindex;
-            goto free_batch;
-        }
-
-        error = netdev_linux_sock_batch_send(sock, ifindex, batch);
+        error = netdev_linux_sock_batch_send(&afpacket, batch);
     } else {
         error = netdev_linux_tap_batch_send(netdev_, batch);
     }
@@ -6171,10 +6172,11 @@ netdev_linux_do_ethtool(const char *name, struct ethtool_cmd *ecmd,
 
 /* Returns an AF_PACKET raw socket or a negative errno value. */
 static int
-af_packet_sock(void)
+af_packet_sock(struct netdev_linux_afpacket *afpacket)
 {
     static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
     static int sock;
+    bool tso = tso_enabled();
 
     if (ovsthread_once_start(&once)) {
         sock = socket(AF_PACKET, SOCK_RAW, 0);
@@ -6184,6 +6186,19 @@ af_packet_sock(void)
                 close(sock);
                 sock = -error;
             }
+
+            if (tso) {
+                int val = 1;
+                error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val,
+                                   sizeof(val));
+                if (error) {
+                    error = errno;
+                    VLOG_ERR("failed to enable vnet in raw socket: %s",
+                             ovs_strerror(errno));
+                    close(sock);
+                    sock = -error;
+                }
+            }
         } else {
             sock = -errno;
             VLOG_ERR("failed to create packet socket: %s",
@@ -6192,5 +6207,31 @@ af_packet_sock(void)
         ovsthread_once_done(&once);
     }
 
+    afpacket->sock = sock;
+    afpacket->virtio_net_hdr = tso;
     return sock;
+}
+
+/* Returns a struct netdev->afpacket or a negative errno value. */
+static int
+netdev_linux_afpacket_sock(struct netdev *netdev_,
+                           struct netdev_linux_afpacket *afpacket)
+{
+    int error = af_packet_sock(afpacket);
+    if (error < 0) {
+        return error;
+    }
+
+    afpacket->ifindex = netdev_get_ifindex(netdev_);
+    if (afpacket->ifindex < 0) {
+        return afpacket->ifindex;
+    }
+
+    int mtu = ETH_PAYLOAD_MAX;
+    if (afpacket->virtio_net_hdr) {
+        netdev_linux_get_mtu__(netdev_linux_cast(netdev_), &mtu);
+    }
+
+    afpacket->mtu = mtu;
+    return 0;
 }

@@ -63,6 +63,7 @@
 #include "smap.h"
 #include "sset.h"
 #include "timeval.h"
+#include "tso.h"
 #include "unaligned.h"
 #include "unixctl.h"
 #include "util.h"
@@ -1325,7 +1326,7 @@ netdev_dpdk_vhost_construct(struct netdev *netdev)
         goto out;
     }
 
-    if (!dpdk_tso_support()) {
+    if (!tso_enabled()) {
         err = rte_vhost_driver_disable_features(dev->vhost_id,
                                     1ULL << VIRTIO_NET_F_HOST_TSO4
                                     | 1ULL << VIRTIO_NET_F_HOST_TSO6
@@ -4478,7 +4479,7 @@ dpdk_vhost_reconfigure_helper(struct netdev_dpdk *dev)
         dev->tx_q[0].map = 0;
     }
 
-    if (dpdk_tso_support()) {
+    if (tso_enabled()) {
         dev->hw_ol_features |= NETDEV_TX_TSO_OFFLOAD;
         VLOG_DBG("%s: TSO enabled on vhost port", dev->up.name);
     }
@@ -4556,7 +4557,7 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
         }
 
         /* Enable External Buffers if TCP Segmentation Offload is enabled */
-        if (dpdk_tso_support()) {
+        if (tso_enabled()) {
             vhost_flags |= RTE_VHOST_USER_EXTBUF_SUPPORT;
         }
 
@@ -4584,7 +4585,7 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
             goto unlock;
         }
 
-        if (!dpdk_tso_support()) {
+        if (!tso_enabled()) {
             err = rte_vhost_driver_disable_features(dev->vhost_id,
                                         1ULL << VIRTIO_NET_F_HOST_TSO4
                                         | 1ULL << VIRTIO_NET_F_HOST_TSO6

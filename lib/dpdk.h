@@ -44,5 +44,4 @@ bool dpdk_per_port_memory(void);
 bool dpdk_available(void);
 void print_dpdk_version(void);
 void dpdk_status(const struct ovsrec_open_vswitch *);
-bool dpdk_tso_support(void);
 #endif /* dpdk.h */

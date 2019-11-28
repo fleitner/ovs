@@ -3234,6 +3234,7 @@ bridge_run(void)
     if (cfg) {
         netdev_set_flow_api_enabled(&cfg->other_config);
         dpdk_init(&cfg->other_config);
+        tso_init(&cfg->other_config);
     }
 
     /* Initialize the ofproto library.  This only needs to run once, but

@@ -178,6 +178,7 @@ void dp_packet_shift(struct dp_packet *, int);
 static inline void dp_packet_clear(struct dp_packet *);
 static inline void *dp_packet_pull(struct dp_packet *, size_t);
 static inline void *dp_packet_try_pull(struct dp_packet *, size_t);
+void dp_packet_insert_vnet(struct dp_packet *, int);
 
 void *dp_packet_steal_data(struct dp_packet *);
 
