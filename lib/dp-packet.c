@@ -530,6 +530,10 @@ dp_packet_insert_vnet(struct dp_packet *b, int mtu)
     vnet->csum_offset = __builtin_offsetof(struct tcphdr, check);
     vnet->hdr_len = ETH_HLEN + sizeof(struct ip_header)
                     + sizeof(struct tcp_header);
-    vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
     vnet->gso_size = mtu - vnet->hdr_len;
+    if (dp_packet_size(b) > vnet->gso_size) {
+        vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+    } else {
+        vnet->gso_type = VIRTIO_NET_HDR_GSO_NONE;
+    }
 }
