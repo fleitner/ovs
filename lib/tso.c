@@ -29,7 +29,7 @@ static bool tso_support_enabled = false;
 void
 tso_init(const struct smap *ovs_other_config)
 {
-    if (smap_get_bool(ovs_other_config, "tso-suport", false)) {
+    if (smap_get_bool(ovs_other_config, "tso-support", false)) {
         static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 
         if (ovsthread_once_start(&once)) {
