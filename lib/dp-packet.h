@@ -555,8 +555,12 @@ dp_packet_reset_offload(struct dp_packet *p)
 static inline bool
 dp_packet_ip_checksum_valid(const struct dp_packet *p)
 {
-    return (p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
-            PKT_RX_IP_CKSUM_GOOD;
+    int ip_tso = (p->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM
+                    && (p->mbuf.ol_flags & PKT_TX_IPV4);
+    int ip_csum = (p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
+                     PKT_RX_IP_CKSUM_GOOD;
+
+    return ip_tso || ip_csum;
 }
 
 static inline bool
@@ -569,8 +573,9 @@ dp_packet_ip_checksum_bad(const struct dp_packet *p)
 static inline bool
 dp_packet_l4_checksum_valid(const struct dp_packet *p)
 {
-    return (p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
-            PKT_RX_L4_CKSUM_GOOD;
+    return ((p->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM)
+            || ((p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+                PKT_RX_L4_CKSUM_GOOD);
 }
 
 static inline bool
