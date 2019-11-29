@@ -193,7 +193,9 @@ dp_packet_clone_with_headroom(const struct dp_packet *buffer, size_t headroom)
             offsetof(struct dp_packet, l2_pad_size));
 
 #ifdef DPDK_NETDEV
-    new_buffer->mbuf.ol_flags = buffer->mbuf.ol_flags;
+    /* The new packet is linear, so copy only the offloading flags */
+    new_buffer->mbuf.ol_flags = buffer->mbuf.ol_flags
+                                & ~(EXT_ATTACHED_MBUF | IND_ATTACHED_MBUF);
 #endif
 
     if (dp_packet_rss_valid(buffer)) {

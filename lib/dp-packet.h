@@ -538,7 +538,7 @@ dp_packet_rss_valid(const struct dp_packet *p)
 static inline void
 dp_packet_reset_offload(struct dp_packet *p)
 {
-    p->mbuf.ol_flags = 0;
+    p->mbuf.ol_flags &= (EXT_ATTACHED_MBUF | IND_ATTACHED_MBUF);
 }
 
 static inline bool
