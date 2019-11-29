@@ -110,6 +110,7 @@ static inline uint16_t dp_packet_get_allocated(const struct dp_packet *);
 static inline void dp_packet_set_allocated(struct dp_packet *, uint16_t);
 
 static inline bool dp_packet_is_tso(struct dp_packet *b);
+static inline bool dp_packet_is_ipv4(struct dp_packet *b);
 
 void *dp_packet_resize_l2(struct dp_packet *, int increment);
 void *dp_packet_resize_l2_5(struct dp_packet *, int increment);
@@ -525,6 +526,12 @@ dp_packet_is_tso(struct dp_packet *b)
            : false;
 }
 
+static inline bool
+dp_packet_is_ipv4(struct dp_packet *b)
+{
+    return b->mbuf.ol_flags & PKT_TX_IPV4;
+}
+
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
  * correct only if 'dp_packet_rss_valid(p)' returns true */
 static inline uint32_t
@@ -661,6 +668,12 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 
 static inline bool
 dp_packet_is_tso(struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+static inline bool
+dp_packet_is_ipv4(struct dp_packet *b OVS_UNUSED)
 {
     return false;
 }

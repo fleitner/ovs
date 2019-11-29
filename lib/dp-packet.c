@@ -523,20 +523,15 @@ dp_packet_insert_vnet(struct dp_packet *b, int mtu)
         return;
     }
 
-    struct rte_mbuf *mbuf = &b->mbuf;
-    /* non-dpdk scenario? should be here? */
     vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
-    vnet->csum_start = mbuf->l2_len + mbuf->l3_len;
+    vnet->csum_start = (char *) dp_packet_l4(b) - (char *) dp_packet_eth(b);
     vnet->csum_offset = __builtin_offsetof(struct tcphdr, check);
     vnet->hdr_len = ETH_HLEN + sizeof(struct ip_header)
                     + sizeof(struct tcp_header);
     vnet->gso_size = mtu - vnet->hdr_len;
     if (dp_packet_size(b) > vnet->gso_size) {
-        if (b->mbuf.ol_flags & PKT_TX_IPV4) {
-           vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
-        } else {
-           vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
-        }
+        vnet->gso_type = dp_packet_is_ipv4(b) ? VIRTIO_NET_HDR_GSO_TCPV4
+                                                : VIRTIO_NET_HDR_GSO_TCPV6;
     } else {
         vnet->gso_type = VIRTIO_NET_HDR_GSO_NONE;
     }
