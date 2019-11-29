@@ -532,7 +532,11 @@ dp_packet_insert_vnet(struct dp_packet *b, int mtu)
                     + sizeof(struct tcp_header);
     vnet->gso_size = mtu - vnet->hdr_len;
     if (dp_packet_size(b) > vnet->gso_size) {
-        vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+        if (b->mbuf.ol_flags & PKT_TX_IPV4) {
+           vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+        } else {
+           vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
+        }
     } else {
         vnet->gso_type = VIRTIO_NET_HDR_GSO_NONE;
     }
