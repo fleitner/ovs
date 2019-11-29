@@ -2074,18 +2074,15 @@ netdev_dpdk_rxq_dealloc(struct netdev_rxq *rxq)
     rte_free(rx);
 }
 
-/* Prepare the packet for TX TSO.
+/* Prepare the packet for transmit TSO.
  * It should be called only if PKT_TX_TCP_SEG is set in ol_flags.
- * Furthermore, it also sets the PKT_TX_TCP_CKSUM and PKT_TX_IP_CKSUM flags,
- * and PKT_TX_IPV4 and PKT_TX_IPV6 in case the packet is IPv4 or IPv6,
- * respectively. */
+ * Furthermore, it also sets the PKT_TX_TCP_CKSUM and PKT_TX_IP_CKSUM flags. */
 static void
 netdev_dpdk_prep_tso_packet(struct rte_mbuf *mbuf, int mtu)
 {
     struct dp_packet *pkt;
     struct tcp_header *th;
 
-    /* FIXME: IPv6 */
     pkt = CONTAINER_OF(mbuf, struct dp_packet, mbuf);
     mbuf->l2_len = (char *) dp_packet_l3(pkt) - (char *) dp_packet_eth(pkt);
     mbuf->l3_len = (char *) dp_packet_l4(pkt) - (char *) dp_packet_l3(pkt);
@@ -2103,7 +2100,6 @@ netdev_dpdk_prep_tso_packet(struct rte_mbuf *mbuf, int mtu)
     }
 
     /* Prepare packet for egress. */
-    mbuf->ol_flags |= PKT_TX_TCP_SEG;
     mbuf->ol_flags |= PKT_TX_TCP_CKSUM;
     mbuf->ol_flags |= PKT_TX_IP_CKSUM;
 
