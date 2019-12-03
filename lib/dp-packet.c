@@ -519,7 +519,7 @@ dp_packet_prepend_vnet_hdr(struct dp_packet *b, int mtu)
     uint64_t ol_flags = b->mbuf.ol_flags;
 
     vnet = dp_packet_push_zeros(b, sizeof *vnet);
-    if ((ol_flags & PKT_TX_TCP_SEG) && (dp_packet_size(b) > vnet->gso_size)) {
+    if ((ol_flags & PKT_TX_TCP_SEG) && (dp_packet_size(b) > mtu)) {
 
         if (ol_flags & PKT_TX_IPV4) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
