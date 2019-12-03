@@ -2107,11 +2107,22 @@ netdev_dpdk_eth_tx_burst(struct netdev_dpdk *dev, int qid,
                          struct rte_mbuf **pkts, int cnt)
 {
     uint32_t nb_tx = 0;
+    uint16_t nb_tx_prep = cnt;
 
-    while (nb_tx != cnt) {
+    if (tso_enabled()) {
+        nb_tx_prep = rte_eth_tx_prepare(dev->port_id, qid, pkts, cnt);
+        if (nb_tx_prep != cnt) {
+            VLOG_WARN_RL(&rl, "%s: Output batch contains invalid packets. "
+                         "Only %u/%u are valid: %s", dev->up.name, nb_tx_prep,
+                         cnt, rte_strerror(rte_errno));
+        }
+    }
+
+    while (nb_tx != nb_tx_prep) {
         uint32_t ret;
 
-        ret = rte_eth_tx_burst(dev->port_id, qid, pkts + nb_tx, cnt - nb_tx);
+        ret = rte_eth_tx_burst(dev->port_id, qid, pkts + nb_tx,
+                               nb_tx_prep - nb_tx);
         if (!ret) {
             break;
         }
