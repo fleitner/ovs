@@ -787,26 +787,26 @@ netdev_get_pt_mode(const struct netdev *netdev)
  * pointing to a reason. */
 bool
 netdev_send_prepare_packet(const uint64_t netdev_flags, struct dp_packet *packet,
-                           char *errormsg)
+                           char **errormsg)
 {
-    if (dp_packet_is_tso(packet)
+    if (dp_packet_hwol_is_tso(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
             /* fall back to GSO in software */
-            errormsg = "No TSO support";
+            *errormsg = "No TSO support";
             return false;
     }
 
     if (dp_packet_l4_checksum_valid(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CKSUM)) {
             /* fall back to L4 csum in software */
-            errormsg = "No L4 checksum support";
+            *errormsg = "No L4 checksum support";
             return false;
     }
 
     if (dp_packet_ip_checksum_valid(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_IPV4_CKSUM)) {
             /* fall back to IP csum in software */
-            errormsg = "No IP checksum support";
+            *errormsg = "No IP checksum support";
             return false;
     }
 
@@ -825,7 +825,7 @@ netdev_send_prepare_batch(const struct netdev *netdev,
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
         char *errormsg = NULL;
 
-        if (netdev_send_prepare_packet(netdev->ol_flags, packet, errormsg)) {
+        if (netdev_send_prepare_packet(netdev->ol_flags, packet, &errormsg)) {
             dp_packet_batch_refill(batch, packet, i);
         } else {
             VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",

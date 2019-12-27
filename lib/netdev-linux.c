@@ -503,6 +503,7 @@ static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
  * changes in the device miimon status, so we can use atomic_count. */
 static atomic_count miimon_cnt = ATOMIC_COUNT_INIT(0);
 
+static void netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu);
 static int netdev_linux_do_ethtool(const char *name, struct ethtool_cmd *,
                                    int cmd, const char *cmd_name);
 static int get_flags(const struct netdev *, unsigned int *flags);
@@ -1351,7 +1352,7 @@ netdev_linux_sock_batch_send(int sock, int ifindex, bool tso, int mtu,
     struct dp_packet *packet;
     DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
         if (tso) {
-            dp_packet_prepend_vnet_hdr(packet, mtu);
+            netdev_linux_prepend_vnet_hdr(packet, mtu);
         }
 
         iov[i].iov_base = dp_packet_data(packet);
@@ -1408,7 +1409,7 @@ netdev_linux_tap_batch_send(struct netdev *netdev_, bool tso, int mtu,
         int error;
 
         if (tso) {
-            dp_packet_prepend_vnet_hdr(packet, mtu);
+            netdev_linux_prepend_vnet_hdr(packet, mtu);
         }
 
         size = dp_packet_size(packet);
@@ -6241,4 +6242,43 @@ af_packet_sock(void)
     }
 
     return sock;
+}
+
+static void
+netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
+{
+    struct virtio_net_hdr *vnet;
+    uint64_t ol_flags = b->mbuf.ol_flags;
+
+    vnet = dp_packet_push_zeros(b, sizeof *vnet);
+    if ((dp_packet_size(b) > mtu) && dp_packet_hwol_is_tso(b)) {
+
+        if (dp_packet_hwol_is_ipv4(b)) {
+            vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+            vnet->hdr_len = ETH_HLEN + IP_HEADER_LEN + TCP_HEADER_LEN;
+        } else {
+            vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
+            vnet->hdr_len = ETH_HLEN + IPV6_HEADER_LEN + TCP_HEADER_LEN;
+        }
+
+        vnet->gso_size = mtu - vnet->hdr_len;
+    } else {
+        vnet->flags = VIRTIO_NET_HDR_GSO_NONE;
+    }
+
+    if (dp_packet_hwol_l4_mask(b)) {
+        vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
+        vnet->csum_start = (char *) dp_packet_l4(b) - (char *) dp_packet_eth(b);
+
+        if (dp_packet_hwol_l4_is_tcp(b)) {
+            vnet->csum_offset = __builtin_offsetof(struct tcp_header, tcp_csum);
+        } else if (dp_packet_hwol_l4_is_udp(b)) {
+            vnet->csum_offset = __builtin_offsetof(struct udp_header, udp_csum);
+        } else if (dp_packet_hwol_l4_is_sctp(b)) {
+            vnet->csum_offset = __builtin_offsetof(struct sctp_header,
+                                                   sctp_csum);
+        } else {
+            VLOG_WARN_RL(&rl, "Unsupported L4 protocol");
+        }
+    }
 }

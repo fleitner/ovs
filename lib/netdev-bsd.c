@@ -703,13 +703,6 @@ netdev_bsd_send(struct netdev *netdev_, int qid OVS_UNUSED,
         const void *data = dp_packet_data(packet);
         size_t size = dp_packet_size(packet);
 
-        /* No TSO support in BSD netdev */
-        if (dp_packet_is_tso(packet)) {
-            VLOG_WARN("%s: Dropping unsupported TSO packet of size %"PRIuSIZE,
-                      name, size);
-            continue;
-        }
-
         while (!error) {
             ssize_t retval;
             if (dev->tap_fd >= 0) {
