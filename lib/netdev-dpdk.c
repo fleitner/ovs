@@ -4342,6 +4342,12 @@ netdev_dpdk_reconfigure(struct netdev *netdev)
 
     rte_free(dev->tx_q);
     err = dpdk_eth_dev_init(dev);
+    if (dev->hw_ol_features & NETDEV_TX_TSO_OFFLOAD) {
+        netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
+        netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CKSUM;
+        netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
+    }
+
     dev->tx_q = netdev_dpdk_alloc_txq(netdev->n_txq);
     if (!dev->tx_q) {
         err = ENOMEM;
@@ -4477,7 +4483,11 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
             goto unlock;
         }
 
-        if (!tso_enabled()) {
+        if (tso_enabled()) {
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CKSUM;
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
+        } else {
             err = rte_vhost_driver_disable_features(dev->vhost_id,
                                         1ULL << VIRTIO_NET_F_HOST_TSO4
                                         | 1ULL << VIRTIO_NET_F_HOST_TSO6
