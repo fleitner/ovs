@@ -727,45 +727,45 @@ dp_packet_hwol_is_tso(const struct dp_packet *b OVS_UNUSED)
 }
 
 static inline bool
-dp_packet_hwol_is_ipv4(const struct dp_packet *b)
+dp_packet_hwol_is_ipv4(const struct dp_packet *b OVS_UNUSED)
 {
     return false;
 }
 
 static inline uint64_t
-dp_packet_hwol_l4_mask(const struct dp_packet *b)
+dp_packet_hwol_l4_mask(const struct dp_packet *b OVS_UNUSED)
 {
-    return 0
+    return 0;
 }
 
 static inline bool
-dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
+dp_packet_hwol_l4_is_tcp(const struct dp_packet *b OVS_UNUSED)
 {
     return false;
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv4(struct dp_packet *b) {
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b OVS_UNUSED) {
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv6(struct dp_packet *b) {
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b OVS_UNUSED) {
 }
 
 static inline void
-dp_packet_hwol_set_csum_tcp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b OVS_UNUSED) {
 }
 
 static inline void
-dp_packet_hwol_set_csum_udp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_udp(struct dp_packet *b OVS_UNUSED) {
 }
 
 static inline void
-dp_packet_hwol_set_csum_sctp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b OVS_UNUSED) {
 }
 
 static inline void
-dp_packet_hwol_set_tcp_seg(struct dp_packet *b) {
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b OVS_UNUSED) {
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
