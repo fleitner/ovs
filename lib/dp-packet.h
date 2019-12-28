@@ -560,6 +560,7 @@ dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
            ? true
            : false;
 }
+
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
  * correct only if 'dp_packet_rss_valid(p)' returns true */
 static inline uint32_t
@@ -591,9 +592,8 @@ static inline bool
 dp_packet_ip_checksum_valid(const struct dp_packet *p)
 {
 
-    return (p->mbuf.ol_flags & PKT_TX_L4_MASK)
-            || ((p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
-                PKT_RX_IP_CKSUM_GOOD);
+    return (p->mbuf.ol_flags & PKT_RX_IP_CKSUM_MASK) ==
+                PKT_RX_IP_CKSUM_GOOD;
 }
 
 static inline bool
@@ -606,9 +606,8 @@ dp_packet_ip_checksum_bad(const struct dp_packet *p)
 static inline bool
 dp_packet_l4_checksum_valid(const struct dp_packet *p)
 {
-    return (p->mbuf.ol_flags & PKT_TX_L4_MASK)
-            || ((p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
-                PKT_RX_L4_CKSUM_GOOD);
+    return (p->mbuf.ol_flags & PKT_RX_L4_CKSUM_MASK) ==
+                PKT_RX_L4_CKSUM_GOOD;
 }
 
 static inline bool
@@ -1005,6 +1004,20 @@ dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
         }
         batch->trunc = false;
     }
+}
+
+static inline bool
+dp_packet_hwol_tx_ip_checksum(const struct dp_packet *p)
+{
+
+    return dp_packet_hwol_l4_mask(p) ? true : false;
+}
+
+static inline bool
+dp_packet_hwol_tx_l4_checksum(const struct dp_packet *p)
+{
+
+    return dp_packet_hwol_l4_mask(p) ? true : false;
 }
 
 #ifdef  __cplusplus
