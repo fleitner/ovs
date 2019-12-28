@@ -6311,7 +6311,7 @@ netdev_linux_parse_vnet_hdr(struct dp_packet *b)
         return 0;
     }
 
-    if (!netdev_linux_parse_l2(b, &l4proto)) {
+    if (netdev_linux_parse_l2(b, &l4proto)) {
         return -EINVAL;
     }
 
