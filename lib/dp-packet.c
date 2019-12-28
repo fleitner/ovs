@@ -17,7 +17,6 @@
 #include <config.h>
 #include <stdlib.h>
 #include <string.h>
-#include <linux/virtio_net.h>
 
 #include "dp-packet.h"
 #include "netdev-afxdp.h"
