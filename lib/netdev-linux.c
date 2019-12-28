@@ -1298,7 +1298,7 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
         }
         dp_packet_delete(buffer);
     } else {
-        if (tso_enabled() && !netdev_linux_parse_vnet_hdr(buffer)) {
+        if (tso_enabled() && netdev_linux_parse_vnet_hdr(buffer)) {
             VLOG_WARN_RL(&rl, "Invalid offloading flags packet on %s: %s",
                          netdev_rxq_get_name(rxq_), ovs_strerror(errno));
             dp_packet_delete(buffer);
