@@ -6255,7 +6255,7 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
     ovs_be16 eth_type;
     int l2_len;
 
-    eth_hdr = dp_packet_eth(b);
+    eth_hdr = dp_packet_at(b, 0, ETH_HEADER_LEN);
     if (!eth_hdr) {
         return -EINVAL;
     }

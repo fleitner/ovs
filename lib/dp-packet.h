@@ -744,6 +744,18 @@ dp_packet_hwol_l4_is_tcp(const struct dp_packet *b OVS_UNUSED)
     return false;
 }
 
+static inline bool
+dp_packet_hwol_l4_is_udp(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
+static inline bool
+dp_packet_hwol_l4_is_sctp(const struct dp_packet *b OVS_UNUSED)
+{
+    return false;
+}
+
 static inline void
 dp_packet_hwol_set_tx_ipv4(struct dp_packet *b OVS_UNUSED) {
 }
