@@ -109,7 +109,6 @@ static inline void dp_packet_set_size(struct dp_packet *, uint32_t);
 static inline uint16_t dp_packet_get_allocated(const struct dp_packet *);
 static inline void dp_packet_set_allocated(struct dp_packet *, uint16_t);
 
-static inline bool dp_packet_hwol_is_tso(struct dp_packet *b);
 void dp_packet_prepend_vnet_hdr(struct dp_packet *, int mtu);
 
 void *dp_packet_resize_l2(struct dp_packet *, int increment);
@@ -518,7 +517,7 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 }
 
 static inline bool
-dp_packet_hwol_is_tso(struct dp_packet *b)
+dp_packet_hwol_is_tso(const struct dp_packet *b)
 {
     return (b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK))
            ? true
@@ -526,19 +525,19 @@ dp_packet_hwol_is_tso(struct dp_packet *b)
 }
 
 static inline bool
-dp_packet_hwol_is_ipv4(struct dp_packet *b)
+dp_packet_hwol_is_ipv4(const struct dp_packet *b)
 {
     return b->mbuf.ol_flags & PKT_TX_IPV4 ? true : false;
 }
 
 static inline uint64_t
-dp_packet_hwol_l4_mask(struct dp_packet *b)
+dp_packet_hwol_l4_mask(const struct dp_packet *b)
 {
     return b->mbuf.ol_flags & PKT_TX_L4_MASK;
 }
 
 static inline bool
-dp_packet_hwol_l4_is_tcp(struct dp_packet *b)
+dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
 {
     return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM
            ? true
@@ -559,6 +558,36 @@ dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
     return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_SCTP_CKSUM
            ? true
            : false;
+}
+
+static inline void
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_IPV4;
+}
+
+static inline void
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_IPV6;
+}
+
+static inline void
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_TCP_CKSUM;
+}
+
+static inline void
+dp_packet_hwol_set_csum_udp(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_UDP_CKSUM;
+}
+
+static inline void
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_SCTP_CKSUM;
+}
+
+static inline void
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b) {
+    b->mbuf.ol_flags |= PKT_TX_TCP_SEG;
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
@@ -692,27 +721,51 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 }
 
 static inline bool
-dp_packet_hwol_is_tso(struct dp_packet *b OVS_UNUSED)
+dp_packet_hwol_is_tso(const struct dp_packet *b OVS_UNUSED)
 {
     return false;
 }
 
 static inline bool
-dp_packet_hwol_is_ipv4(struct dp_packet *b)
+dp_packet_hwol_is_ipv4(const struct dp_packet *b)
 {
     return false;
 }
 
 static inline uint64_t
-dp_packet_hwol_l4_mask(struct dp_packet *b)
+dp_packet_hwol_l4_mask(const struct dp_packet *b)
 {
     return 0
 }
 
 static inline bool
-dp_packet_hwol_l4_is_tcp(struct dp_packet *b)
+dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
 {
     return false;
+}
+
+static inline void
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b) {
+}
+
+static inline void
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b) {
+}
+
+static inline void
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b) {
+}
+
+static inline void
+dp_packet_hwol_set_csum_udp(struct dp_packet *b) {
+}
+
+static inline void
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b) {
+}
+
+static inline void
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b) {
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
