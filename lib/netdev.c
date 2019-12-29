@@ -785,7 +785,7 @@ netdev_get_pt_mode(const struct netdev *netdev)
 /* Check if a 'packet' is compatible with 'netdev_flags'.
  * If a packet is incompatible, return 'false' with the 'errormsg'
  * pointing to a reason. */
-bool
+static bool
 netdev_send_prepare_packet(const uint64_t netdev_flags, struct dp_packet *packet,
                            char **errormsg)
 {
@@ -815,7 +815,7 @@ netdev_send_prepare_packet(const uint64_t netdev_flags, struct dp_packet *packet
 
 /* Check if each packet in 'batch' is compatible with 'netdev' features,
  * otherwise either fall back to software implementation or drop it. */
-void
+static void
 netdev_send_prepare_batch(const struct netdev *netdev,
                           struct dp_packet_batch *batch)
 {
