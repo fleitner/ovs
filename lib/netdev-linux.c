@@ -39,6 +39,7 @@
 #include <linux/virtio_net.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sys/utsname.h>
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -1039,6 +1040,13 @@ static struct netdev_rxq *
 netdev_linux_rxq_alloc(void)
 {
     struct netdev_rxq_linux *rx = xzalloc(sizeof *rx);
+    if (tso_enabled()) {
+        rx->bufaux = xmalloc(LINUX_RXQ_TSO_MAX_LEN);
+        if (rx->bufaux) {
+            rx->bufaux_len = LINUX_RXQ_TSO_MAX_LEN;
+        }
+    }
+
     return &rx->up;
 }
 
@@ -1149,6 +1157,8 @@ netdev_linux_rxq_destruct(struct netdev_rxq *rxq_)
     if (!rx->is_tap) {
         close(rx->fd);
     }
+
+    free(rx->bufaux);
 }
 
 static void
@@ -1179,11 +1189,13 @@ auxdata_has_vlan_tci(const struct tpacket_auxdata *aux)
 
 
 static int
-netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
+netdev_linux_rxq_recv_sock(int fd, char *bufaux, int bufaux_len,
+                           struct dp_packet *buffer)
 {
-    size_t size;
+    size_t std_len;
+    size_t total_len;
     ssize_t retval;
-    struct iovec iov;
+    struct iovec iov[2];
     struct cmsghdr *cmsg;
     union {
         struct cmsghdr cmsg;
@@ -1193,14 +1205,17 @@ netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
 
     /* Reserve headroom for a single VLAN tag */
     dp_packet_reserve(buffer, VLAN_HEADER_LEN);
-    size = dp_packet_tailroom(buffer);
+    std_len = dp_packet_tailroom(buffer);
+    total_len = std_len + bufaux_len;
 
-    iov.iov_base = dp_packet_data(buffer);
-    iov.iov_len = size;
+    iov[0].iov_base = dp_packet_data(buffer);
+    iov[0].iov_len = std_len;
+    iov[1].iov_base = bufaux;
+    iov[1].iov_len = bufaux_len;
     msgh.msg_name = NULL;
     msgh.msg_namelen = 0;
-    msgh.msg_iov = &iov;
-    msgh.msg_iovlen = 1;
+    msgh.msg_iov = iov;
+    msgh.msg_iovlen = 2;
     msgh.msg_control = &cmsg_buffer;
     msgh.msg_controllen = sizeof cmsg_buffer;
     msgh.msg_flags = 0;
@@ -1211,11 +1226,21 @@ netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
 
     if (retval < 0) {
         return errno;
-    } else if (retval > size) {
+    } else if (retval > total_len) {
         return EMSGSIZE;
     }
 
-    dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    if (retval > std_len) {
+        /* Build a single linear TSO packet */
+        size_t extra_len = retval - std_len;
+
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + std_len);
+        dp_packet_prealloc_tailroom(buffer, extra_len);
+        memcpy(dp_packet_tail(buffer), bufaux, extra_len);
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + extra_len);
+    } else {
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    }
 
     for (cmsg = CMSG_FIRSTHDR(&msgh); cmsg; cmsg = CMSG_NXTHDR(&msgh, cmsg)) {
         const struct tpacket_auxdata *aux;
@@ -1248,20 +1273,39 @@ netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
 }
 
 static int
-netdev_linux_rxq_recv_tap(int fd, struct dp_packet *buffer)
+netdev_linux_rxq_recv_tap(int fd, char *bufaux, int bufaux_len,
+                          struct dp_packet *buffer)
 {
     ssize_t retval;
-    size_t size = dp_packet_tailroom(buffer);
+    size_t std_len;
+    struct iovec iov[2];
+
+    std_len = dp_packet_tailroom(buffer);
+    iov[0].iov_base = dp_packet_data(buffer);
+    iov[0].iov_len = std_len;
+    iov[1].iov_base = bufaux;
+    iov[1].iov_len = bufaux_len;
 
     do {
-        retval = read(fd, dp_packet_data(buffer), size);
+        retval = readv(fd, iov, 2);
     } while (retval < 0 && errno == EINTR);
 
     if (retval < 0) {
         return errno;
     }
 
-    dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    if (retval > std_len) {
+        /* Build a single linear TSO packet */
+        size_t extra_len = retval - std_len;
+
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + std_len);
+        dp_packet_prealloc_tailroom(buffer, extra_len);
+        memcpy(dp_packet_tail(buffer), bufaux, extra_len);
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + extra_len);
+    } else {
+        dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    }
+
     return 0;
 }
 
@@ -1288,8 +1332,10 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
     /* Assume Ethernet port. No need to set packet_type. */
     buffer = dp_packet_new_with_headroom(buffer_len, DP_NETDEV_HEADROOM);
     retval = (rx->is_tap
-              ? netdev_linux_rxq_recv_tap(rx->fd, buffer)
-              : netdev_linux_rxq_recv_sock(rx->fd, buffer));
+              ? netdev_linux_rxq_recv_tap(rx->fd, rx->bufaux, rx->bufaux_len,
+                                          buffer)
+              : netdev_linux_rxq_recv_sock(rx->fd, rx->bufaux, rx->bufaux_len,
+                                           buffer));
 
     if (retval) {
         if (retval != EAGAIN && retval != EMSGSIZE) {
