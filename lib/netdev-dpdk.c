@@ -2538,6 +2538,115 @@ out:
     }
 }
 
+static void
+netdev_dpdk_extbuf_free(void *addr OVS_UNUSED, void *opaque)
+{
+    rte_free(opaque);
+}
+
+static struct rte_mbuf *
+dpdk_pktmbuf_attach_extbuf(struct rte_mbuf *pkt, uint32_t data_len)
+{
+    uint32_t total_len = RTE_PKTMBUF_HEADROOM + data_len;
+    struct rte_mbuf_ext_shared_info *shinfo = NULL;
+    uint16_t buf_len;
+    void *buf;
+
+    if (rte_pktmbuf_tailroom(pkt) >= sizeof(*shinfo)) {
+        shinfo = rte_pktmbuf_mtod(pkt, struct rte_mbuf_ext_shared_info *);
+    } else {
+        total_len += sizeof(*shinfo) + sizeof(uintptr_t);
+        total_len = RTE_ALIGN_CEIL(total_len, sizeof(uintptr_t));
+    }
+
+    if (unlikely(total_len > UINT16_MAX)) {
+        VLOG_ERR("Can't copy packet: too big %u", total_len);
+        return NULL;
+    }
+
+    buf_len = total_len;
+    buf = rte_malloc(NULL, buf_len, RTE_CACHE_LINE_SIZE);
+    if (unlikely(buf == NULL)) {
+        VLOG_ERR("Failed to allocate mem using rte_malloc: %u", buf_len);
+        return NULL;
+    }
+
+    /* Initialize shinfo */
+    if (shinfo) {
+        shinfo->free_cb = netdev_dpdk_extbuf_free;
+        shinfo->fcb_opaque = buf;
+        rte_mbuf_ext_refcnt_set(shinfo, 1);
+    } else {
+        shinfo = rte_pktmbuf_ext_shinfo_init_helper(buf, &buf_len,
+                                                    netdev_dpdk_extbuf_free,
+                                                    buf);
+        if (unlikely(shinfo == NULL)) {
+            rte_free(buf);
+            VLOG_ERR("Failed to initialize shinfo");
+            return NULL;
+        }
+    }
+
+    rte_pktmbuf_attach_extbuf(pkt, buf, rte_malloc_virt2iova(buf), buf_len,
+                              shinfo);
+    rte_pktmbuf_reset_headroom(pkt);
+
+    return pkt;
+}
+
+static struct rte_mbuf *
+dpdk_pktmbuf_alloc(struct rte_mempool *mp, uint32_t data_len)
+{
+    struct rte_mbuf *pkt = rte_pktmbuf_alloc(mp);
+
+    if (OVS_UNLIKELY(!pkt)) {
+        return NULL;
+    }
+
+    dp_packet_init_specific((struct dp_packet *)pkt);
+    if (rte_pktmbuf_tailroom(pkt) >= data_len) {
+        return pkt;
+    }
+
+    if (dpdk_pktmbuf_attach_extbuf(pkt, data_len)) {
+        return pkt;
+    }
+
+    rte_pktmbuf_free(pkt);
+
+    return NULL;
+}
+
+static struct dp_packet *
+dpdk_copy_dp_packet_to_mbuf(struct rte_mempool *mp, struct dp_packet *pkt_orig)
+{
+    struct rte_mbuf *mbuf_dest;
+    struct dp_packet *pkt_dest;
+    uint32_t size;
+    uint32_t headroom;
+
+    size = dp_packet_size(pkt_orig);
+    mbuf_dest = dpdk_pktmbuf_alloc(mp, size);
+    if (OVS_UNLIKELY(mbuf_dest == NULL)) {
+            return NULL;
+    }
+
+    pkt_dest = CONTAINER_OF(mbuf_dest, struct dp_packet, mbuf);
+    headroom = dp_packet_headroom(pkt_orig);
+    dp_packet_set_data(pkt_dest, (char *)dp_packet_data(pkt_dest) + headroom);
+    memcpy(dp_packet_data(pkt_dest), dp_packet_data(pkt_orig), size);
+    dp_packet_set_size(pkt_dest, size);
+
+    mbuf_dest->ol_flags = pkt_orig->mbuf.ol_flags;
+    mbuf_dest->tx_offload = pkt_orig->mbuf.tx_offload;
+    mbuf_dest->packet_type = pkt_orig->mbuf.packet_type;
+
+    memcpy(&pkt_dest->l2_pad_size, &pkt_orig->l2_pad_size,
+           sizeof(struct dp_packet) - offsetof(struct dp_packet, l2_pad_size));
+
+    return pkt_dest;
+}
+
 /* Tx function. Transmit packets indefinitely */
 static void
 dpdk_do_tx_copy(struct netdev *netdev, int qid, struct dp_packet_batch *batch)
@@ -2551,7 +2660,7 @@ dpdk_do_tx_copy(struct netdev *netdev, int qid, struct dp_packet_batch *batch)
     enum { PKT_ARRAY_SIZE = NETDEV_MAX_BURST };
 #endif
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
-    struct rte_mbuf *pkts[PKT_ARRAY_SIZE];
+    struct dp_packet *pkts[PKT_ARRAY_SIZE];
     struct netdev_dpdk_sw_stats *sw_stats = dev->sw_stats;
     uint32_t cnt = batch_cnt;
     uint32_t dropped = 0;
@@ -2572,34 +2681,30 @@ dpdk_do_tx_copy(struct netdev *netdev, int qid, struct dp_packet_batch *batch)
         struct dp_packet *packet = batch->packets[i];
         uint32_t size = dp_packet_size(packet);
 
-        if (OVS_UNLIKELY(size > dev->max_packet_len)) {
-            VLOG_WARN_RL(&rl, "Too big size %u max_packet_len %d",
-                         size, dev->max_packet_len);
-
+        if (size > dev->max_packet_len
+            && !(packet->mbuf.ol_flags & PKT_TX_TCP_SEG)) {
+            VLOG_WARN_RL(&rl, "Too big size %u max_packet_len %d", size,
+                         dev->max_packet_len);
             mtu_drops++;
             continue;
         }
 
-        pkts[txcnt] = rte_pktmbuf_alloc(dev->dpdk_mp->mp);
+        pkts[txcnt] = dpdk_copy_dp_packet_to_mbuf(dev->dpdk_mp->mp, packet);
         if (OVS_UNLIKELY(!pkts[txcnt])) {
             dropped = cnt - i;
             break;
         }
-
-        /* We have to do a copy for now */
-        memcpy(rte_pktmbuf_mtod(pkts[txcnt], void *),
-               dp_packet_data(packet), size);
-        dp_packet_set_size((struct dp_packet *)pkts[txcnt], size);
 
         txcnt++;
     }
 
     if (OVS_LIKELY(txcnt)) {
         if (dev->type == DPDK_DEV_VHOST) {
-            __netdev_dpdk_vhost_send(netdev, qid, (struct dp_packet **) pkts,
-                                     txcnt);
+            __netdev_dpdk_vhost_send(netdev, qid, pkts, txcnt);
         } else {
-            tx_failure = netdev_dpdk_eth_tx_burst(dev, qid, pkts, txcnt);
+            tx_failure += netdev_dpdk_eth_tx_burst(dev, qid,
+                                                   (struct rte_mbuf **)pkts,
+                                                   txcnt);
         }
     }
 
