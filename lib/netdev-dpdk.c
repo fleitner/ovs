@@ -2077,28 +2077,61 @@ netdev_dpdk_rxq_dealloc(struct netdev_rxq *rxq)
     rte_free(rx);
 }
 
-/* Prepare the packet for transmit TSO.
- * It should be called only if PKT_TX_TCP_SEG is set in ol_flags.
- * The flags PKT_TX_TCP_CKSUM and PKT_TX_IP_CKSUM are also set. */
-static void
-netdev_dpdk_prep_tso_packet(struct rte_mbuf *mbuf, int mtu)
+/* Prepare the packet for HWOL.
+ * Return True if the packet is OK to continue. */
+static bool
+netdev_dpdk_prep_hwol_packet(struct netdev_dpdk *dev, struct rte_mbuf *mbuf)
 {
     struct dp_packet *pkt = CONTAINER_OF(mbuf, struct dp_packet, mbuf);
-    struct tcp_header *th = dp_packet_l4(pkt);
 
-    mbuf->l2_len = (char *) dp_packet_l3(pkt) - (char *) dp_packet_eth(pkt);
-    mbuf->l3_len = (char *) dp_packet_l4(pkt) - (char *) dp_packet_l3(pkt);
-    /* There's no layer 4 in the packet. */
-    if (!th) {
-        VLOG_WARN_RL(&rl, "TSO packet without L4 header");
-        return;
+    if (mbuf->ol_flags & PKT_TX_L4_MASK) {
+        mbuf->l2_len = (char *)dp_packet_l3(pkt) - (char *)dp_packet_eth(pkt);
+        mbuf->l3_len = (char *)dp_packet_l4(pkt) - (char *)dp_packet_l3(pkt);
+        mbuf->outer_l2_len = 0;
+        mbuf->outer_l3_len = 0;
     }
 
-    mbuf->l4_len = TCP_OFFSET(th->tcp_ctl) * 4;
-    mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM;
-    mbuf->tso_segsz = mtu - mbuf->l3_len - mbuf->l4_len;
-    mbuf->outer_l2_len = 0;
-    mbuf->outer_l3_len = 0;
+    if (mbuf->ol_flags & PKT_TX_TCP_SEG) {
+        struct tcp_header *th = dp_packet_l4(pkt);
+
+        if (!th) {
+            VLOG_WARN_RL(&rl, "%s: TCP Segmentation without L4 header"
+                         " packet len: %"PRIu32"", dev->up.name, mbuf->pkt_len);
+            return false;
+        }
+
+        mbuf->l4_len = TCP_OFFSET(th->tcp_ctl) * 4;
+        mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM;
+        mbuf->tso_segsz = dev->mtu - mbuf->l3_len - mbuf->l4_len;
+    }
+
+    return true;
+}
+
+/* Prepare a batch for HWOL.
+ * Return the number of good packets in the batch. */
+static int
+netdev_dpdk_prep_hwol_batch(struct netdev_dpdk *dev, struct rte_mbuf **pkts, int pkt_cnt)
+{
+    int i = 0;
+    int cnt = 0;
+    struct rte_mbuf *pkt;
+
+    /* Prepare and filter bad HWOL packets */
+    for (i = 0; i < pkt_cnt; i++) {
+        pkt = pkts[i];
+        if (!netdev_dpdk_prep_hwol_packet(dev, pkt)) {
+            rte_pktmbuf_free(pkt);
+            continue;
+        }
+
+        if (OVS_UNLIKELY(i != cnt)) {
+            pkts[cnt] = pkt;
+        }
+        cnt++;
+    }
+
+    return cnt;
 }
 
 /* Tries to transmit 'pkts' to txq 'qid' of device 'dev'.  Takes ownership of
@@ -2412,12 +2445,8 @@ netdev_dpdk_filter_packet_len(struct netdev_dpdk *dev, struct rte_mbuf **pkts,
     /* Filter oversized packets, unless are marked for TSO. */
     for (i = 0; i < pkt_cnt; i++) {
         pkt = pkts[i];
-        if ((pkt->ol_flags & PKT_TX_TCP_SEG)) {
-            /* vhost user client doesn't require 'pkt' to be prepared */
-            if (dev->type != DPDK_DEV_VHOST) {
-                netdev_dpdk_prep_tso_packet(pkt, dev->mtu);
-            }
-        } else if (OVS_UNLIKELY(pkt->pkt_len > dev->max_packet_len)) {
+        if (OVS_UNLIKELY((pkt->pkt_len > dev->max_packet_len)
+            && !(pkt->ol_flags & PKT_TX_TCP_SEG))) {
             VLOG_WARN_RL(&rl, "%s: Too big size %" PRIu32 " "
                          "max_packet_len %d", dev->up.name, pkt->pkt_len,
                          dev->max_packet_len);
@@ -2469,7 +2498,7 @@ __netdev_dpdk_vhost_send(struct netdev *netdev, int qid,
     struct rte_mbuf **cur_pkts = (struct rte_mbuf **) pkts;
     struct netdev_dpdk_sw_stats sw_stats_add;
     unsigned int n_packets_to_free = cnt;
-    unsigned int total_packets = cnt;
+    unsigned int total_packets;
     int i, retries = 0;
     int max_retries = VHOST_ENQ_RETRY_MIN;
     int vid = netdev_dpdk_get_vid(dev);
@@ -2489,7 +2518,8 @@ __netdev_dpdk_vhost_send(struct netdev *netdev, int qid,
         rte_spinlock_lock(&dev->tx_q[qid].tx_lock);
     }
 
-    cnt = netdev_dpdk_filter_packet_len(dev, cur_pkts, cnt);
+    total_packets = netdev_dpdk_prep_hwol_batch(dev, cur_pkts, cnt);
+    cnt = netdev_dpdk_filter_packet_len(dev, cur_pkts, total_packets);
     sw_stats_add.tx_mtu_exceeded_drops = total_packets - cnt;
 
     /* Check has QoS has been configured for the netdev */
@@ -2769,6 +2799,7 @@ netdev_dpdk_send__(struct netdev_dpdk *dev, int qid,
         int batch_cnt = dp_packet_batch_size(batch);
         struct rte_mbuf **pkts = (struct rte_mbuf **) batch->packets;
 
+        batch_cnt = netdev_dpdk_prep_hwol_batch(dev, pkts, batch_cnt);
         tx_cnt = netdev_dpdk_filter_packet_len(dev, pkts, batch_cnt);
         mtu_drops = batch_cnt - tx_cnt;
         qos_drops = tx_cnt;
