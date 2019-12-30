@@ -2667,9 +2667,10 @@ dpdk_copy_dp_packet_to_mbuf(struct rte_mempool *mp, struct dp_packet *pkt_orig)
     memcpy(dp_packet_data(pkt_dest), dp_packet_data(pkt_orig), size);
     dp_packet_set_size(pkt_dest, size);
 
-    mbuf_dest->ol_flags = pkt_orig->mbuf.ol_flags;
     mbuf_dest->tx_offload = pkt_orig->mbuf.tx_offload;
     mbuf_dest->packet_type = pkt_orig->mbuf.packet_type;
+    mbuf_dest->ol_flags |= (pkt_orig->mbuf.ol_flags &
+                            ~(EXT_ATTACHED_MBUF | IND_ATTACHED_MBUF));
 
     memcpy(&pkt_dest->l2_pad_size, &pkt_orig->l2_pad_size,
            sizeof(struct dp_packet) - offsetof(struct dp_packet, l2_pad_size));
