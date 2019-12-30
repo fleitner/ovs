@@ -6372,9 +6372,10 @@ netdev_linux_parse_vnet_hdr(struct dp_packet *b)
     }
 
     if (l4proto && vnet->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
-        uint8_t mask = VIRTIO_NET_HDR_GSO_TCPV4 | VIRTIO_NET_HDR_GSO_TCPV6 |\
-                       VIRTIO_NET_HDR_GSO_UDP;
-        uint8_t type = vnet->gso_type & ~mask;
+        uint8_t allowed_mask = VIRTIO_NET_HDR_GSO_TCPV4
+                                | VIRTIO_NET_HDR_GSO_TCPV6
+                                | VIRTIO_NET_HDR_GSO_UDP;
+        uint8_t type = vnet->gso_type & allowed_mask;
 
         if (type == VIRTIO_NET_HDR_GSO_TCPV4
             || type == VIRTIO_NET_HDR_GSO_TCPV6) {
