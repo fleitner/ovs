@@ -796,17 +796,10 @@ netdev_send_prepare_packet(const uint64_t netdev_flags, struct dp_packet *packet
             return false;
     }
 
-    if (dp_packet_l4_checksum_valid(packet)
+    if (dp_packet_hwol_l4_mask(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CKSUM)) {
             /* fall back to L4 csum in software */
             *errormsg = "No L4 checksum support";
-            return false;
-    }
-
-    if (dp_packet_ip_checksum_valid(packet)
-        && !(netdev_flags & NETDEV_TX_OFFLOAD_IPV4_CKSUM)) {
-            /* fall back to IP csum in software */
-            *errormsg = "No IP checksum support";
             return false;
     }
 
