@@ -2644,6 +2644,13 @@ dpdk_copy_dp_packet_to_mbuf(struct rte_mempool *mp, struct dp_packet *pkt_orig)
     memcpy(&pkt_dest->l2_pad_size, &pkt_orig->l2_pad_size,
            sizeof(struct dp_packet) - offsetof(struct dp_packet, l2_pad_size));
 
+    if (mbuf_dest->ol_flags & PKT_TX_L4_MASK) {
+        mbuf_dest->l2_len = (char *)dp_packet_l3(pkt_dest)
+                                - (char *)dp_packet_eth(pkt_dest);
+        mbuf_dest->l3_len = (char *)dp_packet_l4(pkt_dest)
+                                - (char *) dp_packet_l3(pkt_dest);
+    }
+
     return pkt_dest;
 }
 
