@@ -6396,15 +6396,14 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
 
     if ((dp_packet_size(b) > mtu) && dp_packet_hwol_is_tso(b)) {
 
+        vnet->hdr_len = (char *)dp_packet_l4(b) - (char *)dp_packet_eth(b);
+        vnet->gso_size = mtu - vnet->hdr_len;
         if (dp_packet_hwol_is_ipv4(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
-            vnet->hdr_len = ETH_HLEN + IP_HEADER_LEN + TCP_HEADER_LEN;
         } else {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
-            vnet->hdr_len = ETH_HLEN + IPV6_HEADER_LEN + TCP_HEADER_LEN;
         }
 
-        vnet->gso_size = mtu - vnet->hdr_len;
     } else {
         vnet->flags = VIRTIO_NET_HDR_GSO_NONE;
     }
