@@ -1242,6 +1242,11 @@ netdev_linux_rxq_recv_sock(int fd, char *bufaux, int bufaux_len,
         dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
     }
 
+    if (tso_enabled() && netdev_linux_parse_vnet_hdr(buffer)) {
+        VLOG_WARN_RL(&rl, "Invalid virtio net header");
+        return EINVAL;
+    }
+
     for (cmsg = CMSG_FIRSTHDR(&msgh); cmsg; cmsg = CMSG_NXTHDR(&msgh, cmsg)) {
         const struct tpacket_auxdata *aux;
 
@@ -1306,6 +1311,11 @@ netdev_linux_rxq_recv_tap(int fd, char *bufaux, int bufaux_len,
         dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
     }
 
+    if (tso_enabled() && netdev_linux_parse_vnet_hdr(buffer)) {
+        VLOG_WARN_RL(&rl, "Invalid virtio net header");
+        return EINVAL;
+    }
+
     return 0;
 }
 
@@ -1344,13 +1354,6 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
         }
         dp_packet_delete(buffer);
     } else {
-        if (tso_enabled() && netdev_linux_parse_vnet_hdr(buffer)) {
-            VLOG_WARN_RL(&rl, "Invalid offloading flags packet on %s: %s",
-                         netdev_rxq_get_name(rxq_), ovs_strerror(errno));
-            dp_packet_delete(buffer);
-            return -EINVAL;
-        }
-
         dp_packet_batch_init_packet(batch, buffer);
     }
 
