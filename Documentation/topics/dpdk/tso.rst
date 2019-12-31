@@ -23,9 +23,9 @@
 
       Avoid deeper levels because they do not render well.
 
-===
-TSO
-===
+========================
+Userspace Datapath - TSO
+========================
 
 **Note:** This feature is considered experimental.
 
@@ -69,7 +69,8 @@ QEMU Command Line Parameter::
     csum=on,guest_csum=on,guest_tso4=on,guest_tso6=on\
     ...
 
-2. Ethtool. Assuming that the guest's OS also supports `TSO`, ethtool can be used to enable same::
+2. Ethtool. Assuming that the guest's OS also supports `TSO`, ethtool can be
+used to enable same::
 
     $ ethtool -K eth0 sg on     # scatter-gather is a prerequisite for TSO
     $ ethtool -K eth0 tso on
@@ -78,6 +79,10 @@ QEMU Command Line Parameter::
 ~~~~~~~~~~~
 Limitations
 ~~~~~~~~~~~
-The current OvS `TSO` implementation supports flat and VLAN networks only (i.e.
-no support for `TSO` over tunneled connection [VxLAN, GRE, IPinIP, etc.]).
+The current OvS userspace `TSO` implementation supports flat and VLAN networks
+only (i.e. no support for `TSO` over tunneled connection [VxLAN, GRE, IPinIP, etc.]).
 
+There is no software implementation of TSO, so all ports attached to the
+datapath must support TSO or packets using that feature will be dropped.
+That also means guests using vhost-user in client mode will receive TSO
+packet regardless of TSO being enabled or disabled within the guest.
