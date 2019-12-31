@@ -6397,6 +6397,7 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
     if ((dp_packet_size(b) > mtu) && dp_packet_hwol_is_tso(b)) {
 
         vnet->hdr_len = (char *)dp_packet_l4(b) - (char *)dp_packet_eth(b);
+        vnet->hdr_len += TCP_HEADER_LEN;
         vnet->gso_size = mtu - vnet->hdr_len;
         if (dp_packet_hwol_is_ipv4(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
@@ -6410,7 +6411,7 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
 
     if (dp_packet_hwol_l4_mask(b)) {
         vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
-        vnet->csum_start = (char *) dp_packet_l4(b) - (char *) dp_packet_eth(b);
+        vnet->csum_start = (char *)dp_packet_l4(b) - (char *)dp_packet_eth(b);
 
         if (dp_packet_hwol_l4_is_tcp(b)) {
             vnet->csum_offset = __builtin_offsetof(struct tcp_header, tcp_csum);
