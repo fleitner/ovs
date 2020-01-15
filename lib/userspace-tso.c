@@ -30,7 +30,7 @@ static bool userspace_tso = false;
 void
 userspace_tso_init(const struct smap *ovs_other_config)
 {
-    if (smap_get_bool(ovs_other_config, "userspace-tso-support", false)) {
+    if (smap_get_bool(ovs_other_config, "userspace-tso-enable", false)) {
         static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 
         if (ovsthread_once_start(&once)) {
