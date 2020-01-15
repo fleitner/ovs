@@ -1104,15 +1104,13 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             goto error;
         }
 
-        if (userspace_tso_enabled()) {
-            error = setsockopt(rx->fd, SOL_PACKET, PACKET_VNET_HDR, &val,
-                               sizeof val);
-            if (error) {
-                error = errno;
-                VLOG_ERR("%s: failed to enable vnet hdr in txq raw socket: %s",
-                         netdev_get_name(netdev_), ovs_strerror(errno));
-                goto error;
-            }
+        if (userspace_tso_enabled()
+            && setsockopt(rx->fd, SOL_PACKET, PACKET_VNET_HDR, &val,
+                          sizeof val)) {
+            error = errno;
+            VLOG_ERR("%s: failed to enable vnet hdr in txq raw socket: %s",
+                     netdev_get_name(netdev_), ovs_strerror(errno));
+            goto error;
         }
 
         /* Set non-blocking mode. */
