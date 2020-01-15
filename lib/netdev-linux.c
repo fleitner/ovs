@@ -74,7 +74,7 @@
 #include "socket-util.h"
 #include "sset.h"
 #include "tc.h"
-#include "tso.h"
+#include "userspace-tso.h"
 #include "timer.h"
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
@@ -918,7 +918,7 @@ netdev_linux_common_construct(struct netdev *netdev_)
     netnsid_unset(&netdev->netnsid);
     ovs_mutex_init(&netdev->mutex);
 
-    if (tso_enabled()) {
+    if (userspace_tso_enabled()) {
         netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
         netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CKSUM;
         netdev_->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
@@ -983,7 +983,7 @@ netdev_linux_construct_tap(struct netdev *netdev_)
     /* Create tap device. */
     get_flags(&netdev->up, &netdev->ifi_flags);
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-    if (tso_enabled()) {
+    if (userspace_tso_enabled()) {
         ifr.ifr_flags |= IFF_VNET_HDR;
     }
 
@@ -1050,7 +1050,7 @@ static struct netdev_rxq *
 netdev_linux_rxq_alloc(void)
 {
     struct netdev_rxq_linux *rx = xzalloc(sizeof *rx);
-    if (tso_enabled()) {
+    if (userspace_tso_enabled()) {
         int i;
 
         /* Allocate auxiliay buffers to receive TSO packets */
@@ -1104,7 +1104,7 @@ netdev_linux_rxq_construct(struct netdev_rxq *rxq_)
             goto error;
         }
 
-        if (tso_enabled()) {
+        if (userspace_tso_enabled()) {
             error = setsockopt(rx->fd, SOL_PACKET, PACKET_VNET_HDR, &val,
                                sizeof val);
             if (error) {
@@ -1227,7 +1227,7 @@ netdev_linux_batch_rxq_recv_sock(struct netdev_rxq_linux *rx, int mtu,
     struct dp_packet *buffers[NETDEV_MAX_BURST];
     int i;
 
-    if (tso_enabled()) {
+    if (userspace_tso_enabled()) {
         /* Use the buffer from the allocated packet below to receive MTU
          * sized packets and an aux_buf for extra TSO data. */
         iovlen = IOV_TSO_SIZE;
@@ -1361,7 +1361,7 @@ netdev_linux_batch_rxq_recv_tap(struct netdev_rxq_linux *rx, int mtu,
     int iovlen;
     int i;
 
-    if (tso_enabled()) {
+    if (userspace_tso_enabled()) {
         /* Use the buffer from the allocated packet below to receive MTU
          * sized packets and an aux_buf for extra TSO data. */
         iovlen = IOV_TSO_SIZE;
@@ -1597,7 +1597,7 @@ netdev_linux_send(struct netdev *netdev_, int qid OVS_UNUSED,
                   struct dp_packet_batch *batch,
                   bool concurrent_txq OVS_UNUSED)
 {
-    bool tso = tso_enabled();
+    bool tso = userspace_tso_enabled();
     int mtu = ETH_PAYLOAD_MAX;
     int error = 0;
     int sock = 0;
@@ -6375,7 +6375,7 @@ af_packet_sock(void)
                 sock = -error;
             }
 
-            if (tso_enabled()) {
+            if (userspace_tso_enabled()) {
                 int val = 1;
                 error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val,
                                    sizeof val);

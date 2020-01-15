@@ -20,15 +20,15 @@
 #include "ovs-thread.h"
 #include "openvswitch/vlog.h"
 #include "dpdk.h"
-#include "tso.h"
+#include "userspace-tso.h"
 #include "vswitch-idl.h"
 
-VLOG_DEFINE_THIS_MODULE(tso);
+VLOG_DEFINE_THIS_MODULE(userspace_tso);
 
-static bool tso_support_enabled = false;
+static bool userspace_tso = false;
 
 void
-tso_init(const struct smap *ovs_other_config)
+userspace_tso_init(const struct smap *ovs_other_config)
 {
     if (smap_get_bool(ovs_other_config, "userspace-tso-support", false)) {
         static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
@@ -36,11 +36,11 @@ tso_init(const struct smap *ovs_other_config)
         if (ovsthread_once_start(&once)) {
             if (dpdk_available()) {
                 VLOG_INFO("TCP Segmentation Offloading (TSO) support enabled");
-                tso_support_enabled = true;
+                userspace_tso = true;
             } else {
                 VLOG_ERR("TCP Segmentation Offloading (TSO) is unsupported "
                          "without enabling DPDK");
-                tso_support_enabled = false;
+                userspace_tso = false;
             }
             ovsthread_once_done(&once);
         }
@@ -48,7 +48,7 @@ tso_init(const struct smap *ovs_other_config)
 }
 
 bool
-tso_enabled(void)
+userspace_tso_enabled(void)
 {
-    return tso_support_enabled;
+    return userspace_tso;
 }

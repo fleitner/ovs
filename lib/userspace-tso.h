@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef TSO_H
-#define TSO_H 1
+#ifndef USERSPACE_TSO_H
+#define USERSPACE_TSO_H 1
 
-void tso_init(const struct smap *ovs_other_config);
-bool tso_enabled(void);
+void userspace_tso_init(const struct smap *ovs_other_config);
+bool userspace_tso_enabled(void);
 
-#endif /* tso.h */
+#endif /* userspace-tso.h */
