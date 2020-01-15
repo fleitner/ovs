@@ -792,14 +792,14 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
     if (dp_packet_hwol_is_tso(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
             /* Fall back to GSO in software. */
-            *errormsg = "No TSO support";
+            VLOG_ERR_BUF(errormsg, "No TSO support");
             return false;
     }
 
     if (dp_packet_hwol_l4_mask(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CKSUM)) {
             /* Fall back to L4 csum in software. */
-            *errormsg = "No L4 checksum support";
+            VLOG_ERR_BUF(errormsg, "No L4 checksum support");
             return false;
     }
 
@@ -822,8 +822,8 @@ netdev_send_prepare_batch(const struct netdev *netdev,
             dp_packet_batch_refill(batch, packet, i);
         } else {
             VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",
-                         errormsg ? errormsg : "Unsupported feature",
-                         netdev_get_name(netdev));
+                         netdev_get_name(netdev), errormsg);
+            free(errormsg);
         }
     }
 }
