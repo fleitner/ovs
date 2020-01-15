@@ -1078,10 +1078,10 @@ dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
 }
 
 static inline bool
-dp_packet_hwol_tx_ip_checksum(const struct dp_packet *p)
+dp_packet_hwol_tx_ipv4_checksum(const struct dp_packet *p)
 {
 
-    return !!dp_packet_hwol_l4_mask(p);
+    return !!dp_packet_hwol_is_ipv4(p);
 }
 
 static inline bool
