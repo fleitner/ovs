@@ -34,14 +34,8 @@ userspace_tso_init(const struct smap *ovs_other_config)
         static struct ovsthread_once once = OVSTHREAD_ONCE_INITIALIZER;
 
         if (ovsthread_once_start(&once)) {
-            if (dpdk_available()) {
-                VLOG_INFO("TCP Segmentation Offloading (TSO) support enabled");
-                userspace_tso = true;
-            } else {
-                VLOG_ERR("TCP Segmentation Offloading (TSO) is unsupported "
-                         "without enabling DPDK");
-                userspace_tso = false;
-            }
+            VLOG_INFO("Userspace TCP Segmentation Offloading support enabled");
+            userspace_tso = true;
             ovsthread_once_done(&once);
         }
     }
