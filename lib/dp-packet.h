@@ -522,15 +522,13 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 static inline bool
 dp_packet_hwol_is_tso(const struct dp_packet *b)
 {
-    return (b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK))
-           ? true
-           : false;
+    return !!(b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK));
 }
 
 static inline bool
 dp_packet_hwol_is_ipv4(const struct dp_packet *b)
 {
-    return b->mbuf.ol_flags & PKT_TX_IPV4 ? true : false;
+    return !!(b->mbuf.ol_flags & PKT_TX_IPV4);
 }
 
 static inline uint64_t
@@ -542,25 +540,19 @@ dp_packet_hwol_l4_mask(const struct dp_packet *b)
 static inline bool
 dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
 {
-    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM
-           ? true
-           : false;
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM;
 }
 
 static inline bool
 dp_packet_hwol_l4_is_udp(struct dp_packet *b)
 {
-    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_UDP_CKSUM
-           ? true
-           : false;
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_UDP_CKSUM;
 }
 
 static inline bool
 dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
 {
-    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_SCTP_CKSUM
-           ? true
-           : false;
+    return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_SCTP_CKSUM;
 }
 
 static inline void
@@ -1077,14 +1069,14 @@ static inline bool
 dp_packet_hwol_tx_ip_checksum(const struct dp_packet *p)
 {
 
-    return dp_packet_hwol_l4_mask(p) ? true : false;
+    return !!dp_packet_hwol_l4_mask(p);
 }
 
 static inline bool
 dp_packet_hwol_tx_l4_checksum(const struct dp_packet *p)
 {
 
-    return dp_packet_hwol_l4_mask(p) ? true : false;
+    return !!dp_packet_hwol_l4_mask(p);
 }
 
 #ifdef  __cplusplus
