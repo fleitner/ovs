@@ -2618,11 +2618,12 @@ __netdev_dpdk_vhost_send(struct netdev *netdev, int qid,
         rte_spinlock_lock(&dev->tx_q[qid].tx_lock);
     }
 
+    sw_stats_add.tx_invalid_hwol_drops = cnt;
     if (userspace_tso_enabled()) {
         cnt = netdev_dpdk_prep_hwol_batch(dev, cur_pkts, cnt);
-        sw_stats_add.tx_invalid_hwol_drops = total_packets - cnt;
     }
 
+    sw_stats_add.tx_invalid_hwol_drops -= cnt;
     sw_stats_add.tx_mtu_exceeded_drops = cnt;
     cnt = netdev_dpdk_filter_packet_len(dev, cur_pkts, cnt);
     sw_stats_add.tx_mtu_exceeded_drops -= cnt;
