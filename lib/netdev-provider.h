@@ -57,8 +57,7 @@ struct netdev {
      * opening this device, and therefore got assigned to the "system" class */
     bool auto_classified;
 
-    /* This bitmask of the offloading features enabled/supported by the
-     * supported by the netdev. */
+    /* This bitmask of the offloading features enabled by the netdev. */
     uint64_t ol_flags;
 
     /* If this is 'true', the user explicitly specified an MTU for this
