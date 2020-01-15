@@ -202,6 +202,8 @@ struct netdev_dpdk_sw_stats {
     uint64_t tx_qos_drops;
     /* Packet drops in ingress policer processing. */
     uint64_t rx_qos_drops;
+    /* Packet drops in HWOL processing */
+    uint64_t tx_invalid_hwol_drops;
 };
 
 enum { DPDK_RING_SIZE = 256 };
@@ -2564,7 +2566,8 @@ netdev_dpdk_vhost_update_tx_counters(struct netdev_dpdk *dev,
 {
     int dropped = sw_stats_add->tx_mtu_exceeded_drops +
                   sw_stats_add->tx_qos_drops +
-                  sw_stats_add->tx_failure_drops;
+                  sw_stats_add->tx_failure_drops +
+                  sw_stats_add->tx_invalid_hwol_drops;
     struct netdev_stats *stats = &dev->stats;
     int sent = attempted - dropped;
     int i;
@@ -2583,6 +2586,7 @@ netdev_dpdk_vhost_update_tx_counters(struct netdev_dpdk *dev,
         sw_stats->tx_failure_drops      += sw_stats_add->tx_failure_drops;
         sw_stats->tx_mtu_exceeded_drops += sw_stats_add->tx_mtu_exceeded_drops;
         sw_stats->tx_qos_drops          += sw_stats_add->tx_qos_drops;
+        sw_stats->tx_invalid_hwol_drops += sw_stats_add->tx_invalid_hwol_drops;
     }
 }
 
@@ -2594,7 +2598,7 @@ __netdev_dpdk_vhost_send(struct netdev *netdev, int qid,
     struct rte_mbuf **cur_pkts = (struct rte_mbuf **) pkts;
     struct netdev_dpdk_sw_stats sw_stats_add;
     unsigned int n_packets_to_free = cnt;
-    unsigned int total_packets;
+    unsigned int total_packets = cnt;
     int i, retries = 0;
     int max_retries = VHOST_ENQ_RETRY_MIN;
     int vid = netdev_dpdk_get_vid(dev);
@@ -2614,9 +2618,14 @@ __netdev_dpdk_vhost_send(struct netdev *netdev, int qid,
         rte_spinlock_lock(&dev->tx_q[qid].tx_lock);
     }
 
-    total_packets = netdev_dpdk_prep_hwol_batch(dev, cur_pkts, cnt);
-    cnt = netdev_dpdk_filter_packet_len(dev, cur_pkts, total_packets);
-    sw_stats_add.tx_mtu_exceeded_drops = total_packets - cnt;
+    if (userspace_tso_enabled()) {
+        cnt = netdev_dpdk_prep_hwol_batch(dev, cur_pkts, cnt);
+        sw_stats_add.tx_invalid_hwol_drops = total_packets - cnt;
+    }
+
+    sw_stats_add.tx_mtu_exceeded_drops = cnt;
+    cnt = netdev_dpdk_filter_packet_len(dev, cur_pkts, cnt);
+    sw_stats_add.tx_mtu_exceeded_drops -= cnt;
 
     /* Check has QoS has been configured for the netdev */
     sw_stats_add.tx_qos_drops = cnt;
@@ -2889,27 +2898,33 @@ netdev_dpdk_send__(struct netdev_dpdk *dev, int qid,
         dp_packet_delete_batch(batch, true);
     } else {
         struct netdev_dpdk_sw_stats *sw_stats = dev->sw_stats;
-        int tx_cnt, dropped;
-        int tx_failure, mtu_drops, qos_drops;
+        int dropped;
+        int tx_failure, mtu_drops, qos_drops, hwol_drops;
         int batch_cnt = dp_packet_batch_size(batch);
         struct rte_mbuf **pkts = (struct rte_mbuf **) batch->packets;
 
-        batch_cnt = netdev_dpdk_prep_hwol_batch(dev, pkts, batch_cnt);
-        tx_cnt = netdev_dpdk_filter_packet_len(dev, pkts, batch_cnt);
-        mtu_drops = batch_cnt - tx_cnt;
-        qos_drops = tx_cnt;
-        tx_cnt = netdev_dpdk_qos_run(dev, pkts, tx_cnt, true);
-        qos_drops -= tx_cnt;
+        hwol_drops = batch_cnt;
+        if (userspace_tso_enabled()) {
+            batch_cnt = netdev_dpdk_prep_hwol_batch(dev, pkts, batch_cnt);
+        }
+        hwol_drops -= batch_cnt;
+        mtu_drops = batch_cnt;
+        batch_cnt = netdev_dpdk_filter_packet_len(dev, pkts, batch_cnt);
+        mtu_drops -= batch_cnt;
+        qos_drops = batch_cnt;
+        batch_cnt = netdev_dpdk_qos_run(dev, pkts, batch_cnt, true);
+        qos_drops -= batch_cnt;
 
-        tx_failure = netdev_dpdk_eth_tx_burst(dev, qid, pkts, tx_cnt);
+        tx_failure = netdev_dpdk_eth_tx_burst(dev, qid, pkts, batch_cnt);
 
-        dropped = tx_failure + mtu_drops + qos_drops;
+        dropped = tx_failure + mtu_drops + qos_drops + hwol_drops;
         if (OVS_UNLIKELY(dropped)) {
             rte_spinlock_lock(&dev->stats_lock);
             dev->stats.tx_dropped += dropped;
             sw_stats->tx_failure_drops += tx_failure;
             sw_stats->tx_mtu_exceeded_drops += mtu_drops;
             sw_stats->tx_qos_drops += qos_drops;
+            sw_stats->tx_invalid_hwol_drops += hwol_drops;
             rte_spinlock_unlock(&dev->stats_lock);
         }
     }
@@ -3225,7 +3240,8 @@ netdev_dpdk_get_sw_custom_stats(const struct netdev *netdev,
     SW_CSTAT(tx_failure_drops)       \
     SW_CSTAT(tx_mtu_exceeded_drops)  \
     SW_CSTAT(tx_qos_drops)           \
-    SW_CSTAT(rx_qos_drops)
+    SW_CSTAT(rx_qos_drops)           \
+    SW_CSTAT(tx_invalid_hwol_drops)
 
 #define SW_CSTAT(NAME) + 1
     custom_stats->size = SW_CSTATS;
