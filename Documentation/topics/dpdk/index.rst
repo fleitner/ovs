@@ -40,5 +40,4 @@ DPDK Support
    /topics/dpdk/qos
    /topics/dpdk/pdump
    /topics/dpdk/jumbo-frames
-   /topics/dpdk/tso
    /topics/dpdk/memory

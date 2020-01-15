@@ -35,7 +35,6 @@ DOC_SOURCE = \
 	Documentation/topics/dpdk/index.rst \
 	Documentation/topics/dpdk/bridge.rst \
 	Documentation/topics/dpdk/jumbo-frames.rst \
-	Documentation/topics/dpdk/tso.rst \
 	Documentation/topics/dpdk/memory.rst \
 	Documentation/topics/dpdk/pdump.rst \
 	Documentation/topics/dpdk/phy.rst \
@@ -58,6 +57,7 @@ DOC_SOURCE = \
 	Documentation/topics/ovsdb-replication.rst \
 	Documentation/topics/porting.rst \
 	Documentation/topics/tracing.rst \
+	Documentation/topics/userspace-tso.rst \
 	Documentation/topics/windows.rst \
 	Documentation/howto/index.rst \
 	Documentation/howto/dpdk.rst \

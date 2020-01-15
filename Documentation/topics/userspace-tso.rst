@@ -61,7 +61,8 @@ The default value is ``false``.
 
 Changing ``userspace-tso-enable`` requires restarting the daemon.
 
-When using :doc:`vHost User ports <vhost-user>`, TSO may be enabled as follows.
+When using :doc:`vHost User ports <dpdk/vhost-user>`, TSO may be enabled
+as follows.
 
 `TSO` is enabled in OvS by the DPDK vHost User backend; when a new guest
 connection is established, `TSO` is thus advertised to the guest as an
