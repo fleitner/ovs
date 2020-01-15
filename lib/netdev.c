@@ -66,6 +66,7 @@ COVERAGE_DEFINE(netdev_received);
 COVERAGE_DEFINE(netdev_sent);
 COVERAGE_DEFINE(netdev_add_router);
 COVERAGE_DEFINE(netdev_get_stats);
+COVERAGE_DEFINE(netdev_send_prepare_drops);
 
 struct netdev_saved_flags {
     struct netdev *netdev;
@@ -825,6 +826,7 @@ netdev_send_prepare_batch(const struct netdev *netdev,
             VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",
                          netdev_get_name(netdev), errormsg);
             free(errormsg);
+            COVERAGE_INC(netdev_send_prepare_drops);
         }
     }
 }
