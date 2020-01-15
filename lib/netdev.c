@@ -67,6 +67,7 @@ COVERAGE_DEFINE(netdev_sent);
 COVERAGE_DEFINE(netdev_add_router);
 COVERAGE_DEFINE(netdev_get_stats);
 COVERAGE_DEFINE(netdev_send_prepare_drops);
+COVERAGE_DEFINE(netdev_push_header_drops);
 
 struct netdev_saved_flags {
     struct netdev *netdev;
@@ -823,10 +824,10 @@ netdev_send_prepare_batch(const struct netdev *netdev,
             dp_packet_batch_refill(batch, packet, i);
         } else {
             dp_packet_delete(packet);
+            COVERAGE_INC(netdev_send_prepare_drops);
             VLOG_WARN_RL(&rl, "%s: Packet dropped: %s",
                          netdev_get_name(netdev), errormsg);
             free(errormsg);
-            COVERAGE_INC(netdev_send_prepare_drops);
         }
     }
 }
@@ -941,6 +942,8 @@ netdev_push_header(const struct netdev *netdev,
             pkt_metadata_init(&packet->md, data->out_port);
             dp_packet_batch_refill(batch, packet, i);
         } else {
+            dp_packet_delete(packet);
+            COVERAGE_INC(netdev_push_header_drops);
             VLOG_WARN_RL(&rl, "%s: Tunneling of TSO packet is not supported: "
                          "packet dropped", netdev_get_name(netdev));
         }
