@@ -46,19 +46,20 @@ datasheet for compatibility. Secondly, the NIC must have an associated DPDK
 Poll Mode Driver (PMD) which supports `TSO`. For a list of features per PMD,
 refer to the `DPDK documentation`__.
 
-__ https://doc.dpdk.org/guides/nics/overview.html
+__ https://doc.dpdk.org/guides-19.11/nics/overview.html
 
 Enabling TSO
 ~~~~~~~~~~~~
 
-The TSO support may be enabled via a global config value ``tso-support``.
-Setting this to ``true`` enables TSO support for all ports.
+The TSO support may be enabled via a global config value
+``userspace-tso-support``.  Setting this to ``true`` enables TSO support for
+all ports.
 
-    $ ovs-vsctl set Open_vSwitch . other_config:tso-support=true
+    $ ovs-vsctl set Open_vSwitch . other_config:userspace-tso-support=true
 
 The default value is ``false``.
 
-Changing ``tso-support`` requires restarting the daemon.
+Changing ``userspace-tso-support`` requires restarting the daemon.
 
 When using :doc:`vHost User ports <vhost-user>`, TSO may be enabled as follows.
 

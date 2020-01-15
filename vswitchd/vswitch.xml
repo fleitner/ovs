@@ -690,7 +690,7 @@
          once in few hours or a day or a week.
         </p>
       </column>
-      <column name="other_config" key="tso-support"
+      <column name="other_config" key="userspace-tso-support"
               type='{"type": "boolean"}'>
         <p>
           Set this value to <code>true</code> to enable support for TSO (TCP
