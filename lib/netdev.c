@@ -863,6 +863,10 @@ netdev_send(struct netdev *netdev, int qid, struct dp_packet_batch *batch,
     int error;
 
     netdev_send_prepare_batch(netdev, batch);
+    if (OVS_UNLIKELY(dp_packet_batch_is_empty(batch))) {
+        return 0;
+    }
+
     error = netdev->netdev_class->send(netdev, qid, batch, concurrent_txq);
     if (!error) {
         COVERAGE_INC(netdev_sent);
