@@ -556,32 +556,38 @@ dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv4(struct dp_packet *b) {
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_IPV4;
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv6(struct dp_packet *b) {
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_IPV6;
 }
 
 static inline void
-dp_packet_hwol_set_csum_tcp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_TCP_CKSUM;
 }
 
 static inline void
-dp_packet_hwol_set_csum_udp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_udp(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_UDP_CKSUM;
 }
 
 static inline void
-dp_packet_hwol_set_csum_sctp(struct dp_packet *b) {
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_SCTP_CKSUM;
 }
 
 static inline void
-dp_packet_hwol_set_tcp_seg(struct dp_packet *b) {
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
+{
     b->mbuf.ol_flags |= PKT_TX_TCP_SEG;
 }
 
@@ -751,27 +757,33 @@ dp_packet_hwol_l4_is_sctp(const struct dp_packet *b OVS_UNUSED)
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv4(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_tx_ipv4(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 static inline void
-dp_packet_hwol_set_tx_ipv6(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_tx_ipv6(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 static inline void
-dp_packet_hwol_set_csum_tcp(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_csum_tcp(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 static inline void
-dp_packet_hwol_set_csum_udp(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_csum_udp(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 static inline void
-dp_packet_hwol_set_csum_sctp(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_csum_sctp(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 static inline void
-dp_packet_hwol_set_tcp_seg(struct dp_packet *b OVS_UNUSED) {
+dp_packet_hwol_set_tcp_seg(struct dp_packet *b OVS_UNUSED)
+{
 }
 
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
