@@ -6371,9 +6371,7 @@ af_packet_sock(void)
             if (error) {
                 close(sock);
                 sock = -error;
-            }
-
-            if (userspace_tso_enabled()) {
+            } else if (userspace_tso_enabled()) {
                 int val = 1;
                 error = setsockopt(sock, SOL_PACKET, PACKET_VNET_HDR, &val,
                                    sizeof val);
