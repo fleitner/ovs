@@ -937,15 +937,17 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-        if (!dp_packet_hwol_is_tso(packet)) {
+        if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet)
+                         || dp_packet_hwol_l4_mask(packet))) {
+            COVERAGE_INC(netdev_push_header_drops);
+            dp_packet_delete(packet);
+            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
+                         "not supported: packet dropped",
+                         netdev_get_name(netdev));
+        } else {
             netdev->netdev_class->push_header(netdev, packet, data);
             pkt_metadata_init(&packet->md, data->out_port);
             dp_packet_batch_refill(batch, packet, i);
-        } else {
-            dp_packet_delete(packet);
-            COVERAGE_INC(netdev_push_header_drops);
-            VLOG_WARN_RL(&rl, "%s: Tunneling of TSO packet is not supported: "
-                         "packet dropped", netdev_get_name(netdev));
         }
     }
 

@@ -523,7 +523,7 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
 static inline bool
 dp_packet_hwol_is_tso(const struct dp_packet *b)
 {
-    return !!(b->mbuf.ol_flags & (PKT_TX_TCP_SEG | PKT_TX_L4_MASK));
+    return !!(b->mbuf.ol_flags & PKT_TX_TCP_SEG);
 }
 
 /* Return true if packet 'b' is IPv4. The flag is required when
