@@ -704,6 +704,9 @@
           restarting the daemon.
         </p>
         <p>
+          The feature only works if Open vSwitch is built with DPDK support.
+        </p>
+        <p>
           The feature is considered experimental.
         </p>
       </column>
