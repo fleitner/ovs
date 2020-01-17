@@ -74,10 +74,10 @@
 #include "socket-util.h"
 #include "sset.h"
 #include "tc.h"
-#include "userspace-tso.h"
 #include "timer.h"
 #include "unaligned.h"
 #include "openvswitch/vlog.h"
+#include "userspace-tso.h"
 #include "util.h"
 
 VLOG_DEFINE_THIS_MODULE(netdev_linux);
