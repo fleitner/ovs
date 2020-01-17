@@ -2695,14 +2695,14 @@ dpdk_pktmbuf_attach_extbuf(struct rte_mbuf *pkt, uint32_t data_len)
         total_len = RTE_ALIGN_CEIL(total_len, sizeof(uintptr_t));
     }
 
-    if (unlikely(total_len > UINT16_MAX)) {
+    if (OVS_UNLIKELY(total_len > UINT16_MAX)) {
         VLOG_ERR("Can't copy packet: too big %u", total_len);
         return NULL;
     }
 
     buf_len = total_len;
     buf = rte_malloc(NULL, buf_len, RTE_CACHE_LINE_SIZE);
-    if (unlikely(buf == NULL)) {
+    if (OVS_UNLIKELY(buf == NULL)) {
         VLOG_ERR("Failed to allocate memory using rte_malloc: %u", buf_len);
         return NULL;
     }
@@ -2716,7 +2716,7 @@ dpdk_pktmbuf_attach_extbuf(struct rte_mbuf *pkt, uint32_t data_len)
         shinfo = rte_pktmbuf_ext_shinfo_init_helper(buf, &buf_len,
                                                     netdev_dpdk_extbuf_free,
                                                     buf);
-        if (unlikely(shinfo == NULL)) {
+        if (OVS_UNLIKELY(shinfo == NULL)) {
             rte_free(buf);
             VLOG_ERR("Failed to initialize shared info for mbuf while "
                      "attempting to attach an external buffer.");
