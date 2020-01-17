@@ -2740,7 +2740,6 @@ dpdk_pktmbuf_alloc(struct rte_mempool *mp, uint32_t data_len)
         return NULL;
     }
 
-    dp_packet_init_specific((struct dp_packet *)pkt);
     if (rte_pktmbuf_tailroom(pkt) >= data_len) {
         return pkt;
     }
