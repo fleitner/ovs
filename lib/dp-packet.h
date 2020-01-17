@@ -519,90 +519,89 @@ dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
     b->mbuf.buf_len = s;
 }
 
-/* Return true if packet 'b' offloads TCP segmentation. */
+/* Returns 'true' if packet 'b' is marked for TCP segmentation offloading. */
 static inline bool
 dp_packet_hwol_is_tso(const struct dp_packet *b)
 {
     return !!(b->mbuf.ol_flags & PKT_TX_TCP_SEG);
 }
 
-/* Return true if packet 'b' is IPv4. The flag is required when
- * offload is requested. */
+/* Returns 'true' if packet 'b' is marked for IPv4 checksum offloading. */
 static inline bool
 dp_packet_hwol_is_ipv4(const struct dp_packet *b)
 {
     return !!(b->mbuf.ol_flags & PKT_TX_IPV4);
 }
 
-/* Return the L4 cksum offload bitmask. */
+/* Returns the L4 cksum offload bitmask. */
 static inline uint64_t
 dp_packet_hwol_l4_mask(const struct dp_packet *b)
 {
     return b->mbuf.ol_flags & PKT_TX_L4_MASK;
 }
 
-/* Return true if the packet 'b' offloads TCP checksum calculation. */
+/* Returns 'true' if packet 'b' is marked for TCP checksum offloading. */
 static inline bool
 dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
 {
     return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_TCP_CKSUM;
 }
 
-/* Return true if the packet 'b' offloads UDP checksum calculation. */
+/* Returns 'true' if packet 'b' is marked for UDP checksum offloading. */
 static inline bool
 dp_packet_hwol_l4_is_udp(struct dp_packet *b)
 {
     return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_UDP_CKSUM;
 }
 
-/* Return true if the packet 'b' offloads SCTP checksum calculation. */
+/* Returns 'true' if packet 'b' is marked for SCTP checksum offloading. */
 static inline bool
 dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
 {
     return (b->mbuf.ol_flags & PKT_TX_L4_MASK) == PKT_TX_SCTP_CKSUM;
 }
 
-/* Flag the packet 'b' as IPv4 necessary when offload is used. */
+/* Mark packet 'b' for IPv4 checksum offloading. */
 static inline void
 dp_packet_hwol_set_tx_ipv4(struct dp_packet *b)
 {
     b->mbuf.ol_flags |= PKT_TX_IPV4;
 }
 
-/* Flag the packet 'b' as IPv6 necessary when offload is used. */
+/* Mark packet 'b' for IPv6 checksum offloading. */
 static inline void
 dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
 {
     b->mbuf.ol_flags |= PKT_TX_IPV6;
 }
 
-/* Request TCP checksum offload for packet 'b'. It implies that
- * either the packet 'b' is flagged as IPv4 or IPv6. */
+/* Mark packet 'b' for TCP checksum offloading.  It implies that either
+ * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
 dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
 {
     b->mbuf.ol_flags |= PKT_TX_TCP_CKSUM;
 }
 
-/* Request UDP checksum offload for packet 'b'. It implies that
- * either the packet 'b' is flagged as IPv4 or IPv6. */
+/* Mark packet 'b' for UDP checksum offloading.  It implies that either
+ * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
 dp_packet_hwol_set_csum_udp(struct dp_packet *b)
 {
     b->mbuf.ol_flags |= PKT_TX_UDP_CKSUM;
 }
 
-/* Request SCTP checksum offload for packet 'b'. It implies that
- * either the packet 'b' is flagged as IPv4 or IPv6. */
+/* Mark packet 'b' for SCTP checksum offloading.  It implies that either
+ * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
 dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
 {
     b->mbuf.ol_flags |= PKT_TX_SCTP_CKSUM;
 }
 
-/* Request TCP segmentation offload for packet 'b'. It implies that
- * either the packet 'b' is flagged as IPv4 or IPv6 and also implies
- * that TCP checksum offload is flagged. */
+/* Mark packet 'b' for TCP segmentation offloading.  It implies that
+ * either the packet 'b' is marked for IPv4 or IPv6 checksum offloading
+ * and also for TCP checksum offloading. */
 static inline void
 dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
 {
