@@ -1110,7 +1110,6 @@ dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
 static inline bool
 dp_packet_hwol_tx_l4_checksum(const struct dp_packet *b)
 {
-
     return !!dp_packet_hwol_l4_mask(b);
 }
 
