@@ -202,7 +202,7 @@ struct netdev_dpdk_sw_stats {
     uint64_t tx_qos_drops;
     /* Packet drops in ingress policer processing. */
     uint64_t rx_qos_drops;
-    /* Packet drops in HWOL processing */
+    /* Packet drops in HWOL processing. */
     uint64_t tx_invalid_hwol_drops;
 };
 
