@@ -70,9 +70,9 @@
 #include "smap.h"
 #include "sset.h"
 #include "timeval.h"
-#include "userspace-tso.h"
 #include "unaligned.h"
 #include "unixctl.h"
+#include "userspace-tso.h"
 #include "util.h"
 #include "uuid.h"
 
