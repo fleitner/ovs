@@ -2688,10 +2688,10 @@ dpdk_pktmbuf_attach_extbuf(struct rte_mbuf *pkt, uint32_t data_len)
     uint16_t buf_len;
     void *buf;
 
-    if (rte_pktmbuf_tailroom(pkt) >= sizeof(*shinfo)) {
+    if (rte_pktmbuf_tailroom(pkt) >= sizeof *shinfo) {
         shinfo = rte_pktmbuf_mtod(pkt, struct rte_mbuf_ext_shared_info *);
     } else {
-        total_len += sizeof(*shinfo) + sizeof(uintptr_t);
+        total_len += sizeof *shinfo + sizeof(uintptr_t);
         total_len = RTE_ALIGN_CEIL(total_len, sizeof(uintptr_t));
     }
 
