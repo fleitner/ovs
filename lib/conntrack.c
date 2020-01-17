@@ -2023,7 +2023,7 @@ conn_key_extract(struct conntrack *ct, struct dp_packet *pkt, ovs_be16 dl_type,
             ok = false;
         } else {
             bool hwol_good_l3_csum = dp_packet_ip_checksum_valid(pkt)
-                                     || dp_packet_hwol_tx_ipv4_checksum(pkt);
+                                     || dp_packet_hwol_is_ipv4(pkt);
             /* Validate the checksum only when hwol is not supported. */
             ok = extract_l3_ipv4(&ctx->key, l3, dp_packet_l3_size(pkt), NULL,
                                  !hwol_good_l3_csum);
@@ -3239,7 +3239,7 @@ handle_ftp_ctl(struct conntrack *ct, const struct conn_lookup_ctx *ctx,
                 }
                 if (seq_skew) {
                     ip_len = ntohs(l3_hdr->ip_tot_len) + seq_skew;
-                    if (!dp_packet_hwol_tx_ipv4_checksum(pkt)) {
+                    if (!dp_packet_hwol_is_ipv4(pkt)) {
                         l3_hdr->ip_csum = recalc_csum16(l3_hdr->ip_csum,
                                                         l3_hdr->ip_tot_len,
                                                         htons(ip_len));

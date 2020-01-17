@@ -1106,14 +1106,6 @@ dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
     }
 }
 
-/* Return true if the packet 'b' requested IPv4 checksum offload. */
-static inline bool
-dp_packet_hwol_tx_ipv4_checksum(const struct dp_packet *b)
-{
-
-    return !!dp_packet_hwol_is_ipv4(b);
-}
-
 /* Return true if the packet 'b' requested L4 checksum offload. */
 static inline bool
 dp_packet_hwol_tx_l4_checksum(const struct dp_packet *b)
