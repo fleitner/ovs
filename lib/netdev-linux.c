@@ -1053,7 +1053,7 @@ netdev_linux_rxq_alloc(void)
     if (userspace_tso_enabled()) {
         int i;
 
-        /* Allocate auxiliay buffers to receive TSO packets */
+        /* Allocate auxiliay buffers to receive TSO packets. */
         for (i = 0; i < NETDEV_MAX_BURST; i++) {
             rx->aux_bufs[i] = xmalloc(LINUX_RXQ_TSO_MAX_LEN);
         }
@@ -1335,7 +1335,7 @@ netdev_linux_batch_rxq_recv_sock(struct netdev_rxq_linux *rx, int mtu,
         dp_packet_batch_add(batch, buffers[i]);
     }
 
-    /* Delete unused buffers */
+    /* Delete unused buffers. */
     for (; i < NETDEV_MAX_BURST; i++) {
         dp_packet_delete(buffers[i]);
     }
