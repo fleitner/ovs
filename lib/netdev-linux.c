@@ -1429,6 +1429,9 @@ netdev_linux_batch_rxq_recv_tap(struct netdev_rxq_linux *rx, int mtu,
     return 0;
 }
 
+static uint64_t cycles = 0;
+static uint64_t n = 0;
+
 static int
 netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
                       int *qfill)
@@ -1437,15 +1440,29 @@ netdev_linux_rxq_recv(struct netdev_rxq *rxq_, struct dp_packet_batch *batch,
     struct netdev *netdev = rx->up.netdev;
     ssize_t retval;
     int mtu;
+    static uint64_t start;
+    static uint64_t end;
 
     if (netdev_linux_get_mtu__(netdev_linux_cast(netdev), &mtu)) {
         mtu = ETH_PAYLOAD_MAX;
     }
 
     dp_packet_batch_init(batch);
+    if (n && n % 1000000 == 0) {
+        VLOG_WARN("Average cycles: %lu", cycles / n);
+        cycles = n = 0;
+    }
+
+    start = rte_get_tsc_cycles();
     retval = (rx->is_tap
               ? netdev_linux_batch_rxq_recv_tap(rx, mtu, batch)
               : netdev_linux_batch_rxq_recv_sock(rx, mtu, batch));
+
+    end = rte_get_tsc_cycles();
+    if (end > start) {
+        cycles += (end - start);
+        n++;
+    }
 
     if (retval) {
         if (retval != EAGAIN && retval != EMSGSIZE) {
