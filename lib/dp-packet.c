@@ -243,7 +243,7 @@ dp_packet_copy__(struct dp_packet *b, uint8_t *new_base,
 
 /* Reallocates 'b' so that it has exactly 'new_headroom' and 'new_tailroom'
  * bytes of headroom and tailroom, respectively. */
-static void
+void
 dp_packet_resize__(struct dp_packet *b, size_t new_headroom, size_t new_tailroom)
 {
     void *new_base, *new_data;

@@ -113,6 +113,8 @@ static inline void dp_packet_set_size(struct dp_packet *, uint32_t);
 
 static inline uint16_t dp_packet_get_allocated(const struct dp_packet *);
 static inline void dp_packet_set_allocated(struct dp_packet *, uint16_t);
+void dp_packet_resize__(struct dp_packet *b, size_t new_headroom,
+                        size_t new_tailroom);
 
 void *dp_packet_resize_l2(struct dp_packet *, int increment);
 void *dp_packet_resize_l2_5(struct dp_packet *, int increment);

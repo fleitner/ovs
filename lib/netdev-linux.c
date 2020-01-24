@@ -1299,6 +1299,7 @@ netdev_linux_batch_rxq_recv_sock(struct netdev_rxq_linux *rx, int mtu,
             b = rx->aux_bufs[i];
             dp_packet_set_size(b, mmsgs[i].msg_len - std_len);
             dp_packet_push(b, dp_packet_data(buffers[i]), std_len);
+            dp_packet_resize__(b, dp_packet_headroom(b), 0);
             dp_packet_delete(buffers[i]);
             rx->aux_bufs[i] = dp_packet_new_with_headroom(tso_len,
                                                           headroom);
