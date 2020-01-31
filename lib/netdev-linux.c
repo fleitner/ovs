@@ -1238,7 +1238,7 @@ netdev_linux_batch_rxq_recv_sock(struct netdev_rxq_linux *rx, int mtu,
          iovs[i][IOV_PACKET].iov_len = std_len;
          if (iovlen == IOV_TSO_SIZE) {
              iovs[i][IOV_AUXBUF].iov_base = dp_packet_data(rx->aux_bufs[i]);
-             iovs[i][IOV_AUXBUF].iov_len = dp_packet_size(rx->aux_bufs[i]);
+             iovs[i][IOV_AUXBUF].iov_len = dp_packet_tailroom(rx->aux_bufs[i]);
          }
 
          mmsgs[i].msg_hdr.msg_name = NULL;
@@ -1383,7 +1383,7 @@ netdev_linux_batch_rxq_recv_tap(struct netdev_rxq_linux *rx, int mtu,
         iov[IOV_PACKET].iov_len = std_len;
         if (iovlen == IOV_TSO_SIZE) {
             iov[IOV_AUXBUF].iov_base = dp_packet_data(rx->aux_bufs[i]);
-            iov[IOV_AUXBUF].iov_len = dp_packet_size(rx->aux_bufs[i]);
+            iov[IOV_AUXBUF].iov_len = dp_packet_tailroom(rx->aux_bufs[i]);
         }
 
         do {
