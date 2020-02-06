@@ -495,6 +495,13 @@ dp_packet_set_size(struct dp_packet *b, uint32_t v)
                                       * this segment. */
 }
 
+/* Prefetch data_off from packet 'b'. */
+static inline void
+__packet_data_prefetch(const struct dp_packet *b)
+{
+    OVS_PREFETCH(&(b->mbuf.data_off));
+}
+
 static inline uint16_t
 __packet_data(const struct dp_packet *b)
 {
@@ -622,6 +629,12 @@ static inline void
 dp_packet_set_size(struct dp_packet *b, uint32_t v)
 {
     b->size_ = v;
+}
+
+/* Only available for DPDK. */
+static inline void
+__packet_data_prefetch(const struct dp_packet *b)
+{
 }
 
 static inline uint16_t
@@ -879,6 +892,10 @@ dp_packet_batch_clone(struct dp_packet_batch *dst,
 
     dp_packet_batch_init(dst);
     DP_PACKET_BATCH_FOR_EACH (i, packet, src) {
+        if ((i + 1) < dp_packet_batch_size(src)) {
+            __packet_data_prefetch(src->packets[i+1]);
+        }
+
         uint32_t headroom = dp_packet_headroom(packet);
         struct dp_packet *pkt_clone;
 
