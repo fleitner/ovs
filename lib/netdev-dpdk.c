@@ -5186,6 +5186,7 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
     int err;
     uint64_t vhost_flags = 0;
+    uint64_t vhost_unsup_flags;
     bool zc_enabled;
 
     ovs_mutex_lock(&dev->mutex);
@@ -5252,16 +5253,22 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
             netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
             netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CKSUM;
             netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
+            vhost_unsup_flags = 1ULL << VIRTIO_NET_F_HOST_ECN
+                                | 1ULL << VIRTIO_NET_F_HOST_UFO;
         } else {
-            err = rte_vhost_driver_disable_features(dev->vhost_id,
-                                        1ULL << VIRTIO_NET_F_HOST_TSO4
-                                        | 1ULL << VIRTIO_NET_F_HOST_TSO6
-                                        | 1ULL << VIRTIO_NET_F_CSUM);
-            if (err) {
-                VLOG_ERR("rte_vhost_driver_disable_features failed for "
-                         "vhost user client port: %s\n", dev->up.name);
-                goto unlock;
-            }
+            vhost_unsup_flags = 1ULL << VIRTIO_NET_F_CSUM
+                                | 1ULL << VIRTIO_NET_F_HOST_UFO
+                                | 1ULL << VIRTIO_NET_F_HOST_TSO4
+                                | 1ULL << VIRTIO_NET_F_HOST_TSO6
+                                | 1ULL << VIRTIO_NET_F_HOST_ECN;
+        }
+
+        err = rte_vhost_driver_disable_features(dev->vhost_id,
+                                                vhost_unsup_flags);
+        if (err) {
+            VLOG_ERR("rte_vhost_driver_disable_features failed for "
+                     "vhost user client port: %s\n", dev->up.name);
+            goto unlock;
         }
 
         err = rte_vhost_driver_start(dev->vhost_id);
