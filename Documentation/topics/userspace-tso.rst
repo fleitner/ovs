@@ -113,6 +113,12 @@ __ https://patches.dpdk.org/patch/64136/
 This fix is expected to be included in the 19.11.1 release. When OVS migrates
 to this DPDK release, this limitation can be removed.
 
+All kernel devices that use the raw socket interface (veth, for example)
+require the kernel commit 9d2f67e43b73 ("net/packet: fix packet drop
+as of virtio gso") in order to work properly. This commit was merged
+in upstream kernel 4.19-rc7, so make sure your kernel is either
+newer or contains the backport.
+
 ~~~~~~~~~~~~~~~~~~
 Performance Tuning
 ~~~~~~~~~~~~~~~~~~
