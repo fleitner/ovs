@@ -405,6 +405,9 @@ enum dpdk_hw_ol_features {
     NETDEV_RX_HW_SCATTER = 1 << 2,
     NETDEV_TX_TSO_OFFLOAD = 1 << 3,
     NETDEV_TX_SCTP_CHECKSUM_OFFLOAD = 1 << 4,
+    NETDEV_TX_VXLAN_TNL_TSO = 1 << 5,
+    NETDEV_TX_GRE_TNL_TSO = 1 << 6,
+    NETDEV_TX_GENEVE_TNL_TSO = 1 << 7
 };
 
 /*
@@ -991,6 +994,18 @@ dpdk_eth_dev_port_config(struct netdev_dpdk *dev, int n_rxq, int n_txq)
         if (dev->hw_ol_features & NETDEV_TX_SCTP_CHECKSUM_OFFLOAD) {
             conf.txmode.offloads |= DEV_TX_OFFLOAD_SCTP_CKSUM;
         }
+
+        if (dev->hw_ol_features & NETDEV_TX_VXLAN_TNL_TSO) {
+            conf.txmode.offloads |= DEV_TX_OFFLOAD_VXLAN_TNL_TSO;
+        }
+
+        if (dev->hw_ol_features & NETDEV_TX_GRE_TNL_TSO) {
+            conf.txmode.offloads |= DEV_TX_OFFLOAD_GRE_TNL_TSO;
+        }
+
+        if (dev->hw_ol_features & NETDEV_TX_GENEVE_TNL_TSO) {
+            conf.txmode.offloads |= DEV_TX_OFFLOAD_GENEVE_TNL_TSO;
+        }
     }
 
     /* Limit configured rss hash functions to only those supported
@@ -1131,6 +1146,27 @@ dpdk_eth_dev_init(struct netdev_dpdk *dev)
             } else {
                 VLOG_WARN("%s: Tx SCTP checksum offload is not supported, "
                           "SCTP packets sent to this device will be dropped",
+                          netdev_get_name(&dev->up));
+            }
+            if (info.tx_offload_capa & DEV_TX_OFFLOAD_VXLAN_TNL_TSO) {
+                dev->hw_ol_features |= NETDEV_TX_VXLAN_TNL_TSO;
+            } else {
+                VLOG_WARN("%s: Tx VXLAN offloading is not supported, "
+                          "VXLAN packets sent to this device will be dropped",
+                          netdev_get_name(&dev->up));
+            }
+            if (info.tx_offload_capa & DEV_TX_OFFLOAD_GRE_TNL_TSO) {
+                dev->hw_ol_features |= NETDEV_TX_GRE_TNL_TSO;
+            } else {
+                VLOG_WARN("%s: Tx GRE offloading is not supported, "
+                          "GRE packets sent to this device will be dropped",
+                          netdev_get_name(&dev->up));
+            }
+            if (info.tx_offload_capa & DEV_TX_OFFLOAD_GENEVE_TNL_TSO) {
+                dev->hw_ol_features |= NETDEV_TX_GENEVE_TNL_TSO;
+            } else {
+                VLOG_WARN("%s: Tx GENEVE offloading is not supported, "
+                          "GENEVE packets sent to this device will be dropped",
                           netdev_get_name(&dev->up));
             }
         } else {
@@ -1716,6 +1752,21 @@ netdev_dpdk_get_config(const struct netdev *netdev, struct smap *args)
             smap_add(args, "tx_tso_offload", "true");
         } else {
             smap_add(args, "tx_tso_offload", "false");
+        }
+        if (dev->hw_ol_features & NETDEV_TX_VXLAN_TNL_TSO) {
+            smap_add(args, "tx_vxlan_offload", "true");
+        } else {
+            smap_add(args, "tx_vxlan_offload", "false");
+        }
+        if (dev->hw_ol_features & NETDEV_TX_GRE_TNL_TSO) {
+            smap_add(args, "tx_gre_offload", "true");
+        } else {
+            smap_add(args, "tx_gre_offload", "false");
+        }
+        if (dev->hw_ol_features & NETDEV_TX_GENEVE_TNL_TSO) {
+            smap_add(args, "tx_geneve_offload", "true");
+        } else {
+            smap_add(args, "tx_geneve_offload", "false");
         }
         smap_add(args, "lsc_interrupt_mode",
                  dev->lsc_interrupt_mode ? "true" : "false");
@@ -4951,6 +5002,15 @@ netdev_dpdk_reconfigure(struct netdev *netdev)
         netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
         if (dev->hw_ol_features & NETDEV_TX_SCTP_CHECKSUM_OFFLOAD) {
             netdev->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CKSUM;
+        }
+        if (dev->hw_ol_features & NETDEV_TX_VXLAN_TNL_TSO) {
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_VXLAN_TNL_TSO;
+        }
+        if (dev->hw_ol_features & NETDEV_TX_GRE_TNL_TSO) {
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_GRE_TNL_TSO;
+        }
+        if (dev->hw_ol_features & NETDEV_TX_GENEVE_TNL_TSO) {
+            netdev->ol_flags |= NETDEV_TX_OFFLOAD_GENEVE_TNL_TSO;
         }
     }
 
