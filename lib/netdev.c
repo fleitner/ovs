@@ -792,7 +792,32 @@ static bool
 netdev_send_prepare_packet(const uint64_t netdev_flags,
                            struct dp_packet *packet, char **errormsg)
 {
+    uint64_t tnl_mask;
     uint64_t l4_mask;
+
+    tnl_mask = dp_packet_hwol_tnl_mask(packet);
+    if (tnl_mask) {
+        if (dp_packet_hwol_tnl_is_geneve(packet)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_GENEVE_TNL_TSO)) {
+                VLOG_ERR_BUF(errormsg, "No GENEVE encapsulation support");
+                return false;
+            }
+        } else if (dp_packet_hwol_tnl_is_vxlan(packet)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_VXLAN_TNL_TSO)) {
+                VLOG_ERR_BUF(errormsg, "No VXLAN encapsulation support");
+                return false;
+            }
+        } else if (dp_packet_hwol_tnl_is_gre(packet)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_GRE_TNL_TSO)) {
+                VLOG_ERR_BUF(errormsg, "No GRE encapsulation support");
+                return false;
+            }
+        } else {
+            VLOG_ERR_BUF(errormsg, "No encapsulation support: mask: %"PRIu64,
+                         tnl_mask);
+            return false;
+        }
+    }
 
     if (dp_packet_hwol_is_tso(packet)
         && !(netdev_flags & NETDEV_TX_OFFLOAD_TCP_TSO)) {
@@ -962,16 +987,25 @@ netdev_push_header(const struct netdev *netdev,
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
         if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet)
                          || dp_packet_hwol_l4_mask(packet))) {
-            COVERAGE_INC(netdev_push_header_drops);
-            dp_packet_delete(packet);
-            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
-                         "not supported: packet dropped",
-                         netdev_get_name(netdev));
-        } else {
-            netdev->netdev_class->push_header(netdev, packet, data);
-            pkt_metadata_init(&packet->md, data->out_port);
-            dp_packet_batch_refill(batch, packet, i);
+            if (data->tnl_type == OVS_VPORT_TYPE_GRE) {
+                dp_packet_hwol_set_gre_tnl_tso(packet);
+            } else if (data->tnl_type == OVS_VPORT_TYPE_VXLAN) {
+                dp_packet_hwol_set_vxlan_tnl_tso(packet);
+            } else if (data->tnl_type == OVS_VPORT_TYPE_GENEVE) {
+                dp_packet_hwol_set_geneve_tnl_tso(packet);
+            } else {
+                COVERAGE_INC(netdev_push_header_drops);
+                dp_packet_delete(packet);
+                VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags "
+                             "is not supported: packet dropped",
+                             netdev_get_name(netdev));
+                continue;
+            }
         }
+
+        netdev->netdev_class->push_header(netdev, packet, data);
+        pkt_metadata_init(&packet->md, data->out_port);
+        dp_packet_batch_refill(batch, packet, i);
     }
 
     return 0;

@@ -610,6 +610,55 @@ dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
     b->mbuf.ol_flags |= PKT_TX_TCP_SEG;
 }
 
+/* Returns the TNL offload bitmask. */
+static inline uint64_t
+dp_packet_hwol_tnl_mask(const struct dp_packet *b)
+{
+    return b->mbuf.ol_flags & PKT_TX_TUNNEL_MASK;
+}
+
+/* Returns 'true' if packet 'b' is marked for GRE encap offloading. */
+static inline bool
+dp_packet_hwol_tnl_is_gre(const struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_GRE;
+}
+
+/* Returns 'true' if packet 'b' is marked for VXLAN encap offloading. */
+static inline bool
+dp_packet_hwol_tnl_is_vxlan(const struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_VXLAN;
+}
+
+/* Returns 'true' if packet 'b' is marked for GENEVE encap offloading. */
+static inline bool
+dp_packet_hwol_tnl_is_geneve(const struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_GENEVE;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_gre_tnl_tso(struct dp_packet *b OVS_UNUSED)
+{
+    b->mbuf.ol_flags |= PKT_TX_TUNNEL_GRE;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_vxlan_tnl_tso(struct dp_packet *b OVS_UNUSED)
+{
+    b->mbuf.ol_flags |= PKT_TX_TUNNEL_VXLAN;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_geneve_tnl_tso(struct dp_packet *b OVS_UNUSED)
+{
+    b->mbuf.ol_flags |= PKT_TX_TUNNEL_GENEVE;
+}
+
 /* Returns the RSS hash of the packet 'p'.  Note that the returned value is
  * correct only if 'dp_packet_rss_valid(p)' returns true */
 static inline uint32_t
@@ -814,6 +863,51 @@ dp_packet_hwol_set_csum_sctp(struct dp_packet *b OVS_UNUSED)
 /* There are no implementation when not DPDK enabled datapath. */
 static inline void
 dp_packet_hwol_set_tcp_seg(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline uint64_t
+dp_packet_hwol_tnl_mask(const struct dp_packet *b)
+{
+    return 0;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_tnl_is_gre(const struct dp_packet *b)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_tnl_is_vxlan(const struct dp_packet *b)
+{
+    return false;
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline bool
+dp_packet_hwol_tnl_is_geneve(const struct dp_packet *b)
+{
+    return false;
+}
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_gre_tnl_tso(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_vxlan_tnl_tso(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* There are no implementation when not DPDK enabled datapath. */
+static inline void
+dp_packet_hwol_set_geneve_tnl_tso(struct dp_packet *b OVS_UNUSED)
 {
 }
 

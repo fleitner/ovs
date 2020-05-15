@@ -246,13 +246,15 @@ netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
     struct udp_header *udp;
     int ip_tot_size;
 
-    udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
+    udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len,
+                                    &ip_tot_size);
 
     /* set udp src port */
     udp->udp_src = netdev_tnl_get_src_port(packet);
     udp->udp_len = htons(ip_tot_size);
 
     if (udp->udp_csum) {
+        /* FBL: FIXME: check how udp csum works with offloading. */
         netdev_tnl_calc_udp_csum(udp, packet, ip_tot_size);
     }
 }
@@ -457,8 +459,10 @@ netdev_gre_push_header(const struct netdev *netdev,
     struct gre_base_hdr *greh;
     int ip_tot_size;
 
-    greh = netdev_tnl_push_ip_header(packet, data->header, data->header_len, &ip_tot_size);
+    greh = netdev_tnl_push_ip_header(packet, data->header, data->header_len,
+                                     &ip_tot_size);
 
+    /* FBL: FIXME: check how GRE csum works with offloading. */
     if (greh->flags & htons(GRE_CSUM)) {
         ovs_be16 *csum_opt = (ovs_be16 *) (greh + 1);
         *csum_opt = csum(greh, ip_tot_size);
