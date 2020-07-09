@@ -45,6 +45,7 @@ struct bond_settings {
 
     /* Balancing configuration. */
     enum bond_mode balance;
+    const char *primary;        /* For AB balance, primary interface name. */
     int rebalance_interval;     /* Milliseconds between rebalances.
                                    Zero to disable rebalancing. */
 
