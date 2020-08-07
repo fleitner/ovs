@@ -81,6 +81,8 @@ enum dp_packet_offload_mask {
     DEF_OL_FLAG(DP_PACKET_OL_TX_UDP_CKSUM, PKT_TX_UDP_CKSUM, 0x400),
     /* Offload SCTP checksum. */
     DEF_OL_FLAG(DP_PACKET_OL_TX_SCTP_CKSUM, PKT_TX_SCTP_CKSUM, 0x800),
+    /* VXLAN TCP Segmentation Offload. */
+    DEF_OL_FLAG(DP_PACKET_OL_TX_TUNNEL_VXLAN, PKT_TX_TUNNEL_VXLAN, 0x1000),
     /* Adding new field requires adding to DP_PACKET_OL_SUPPORTED_MASK. */
 };
 
@@ -1031,6 +1033,80 @@ dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_SEG;
 }
+
+#ifdef DPDK_NETDEV
+/* Mark packet 'b' for VXLAN TCP segmentation offloading. */
+static inline void
+dp_packet_hwol_set_vxlan_tcp_seg(struct dp_packet *b)
+{
+    b->mbuf.ol_flags |= DP_PACKET_OL_TX_TUNNEL_VXLAN;
+    b->mbuf.l2_len += sizeof(struct udp_header) +
+                      sizeof(struct vxlanhdr);
+    b->mbuf.outer_l2_len = ETH_HEADER_LEN;
+    b->mbuf.outer_l3_len = IP_HEADER_LEN;
+}
+
+/* Check if it is a VXLAN packet */
+static inline bool
+dp_packet_hwol_is_vxlan_tcp_seg(struct dp_packet *b)
+{
+    return (b->mbuf.ol_flags & DP_PACKET_OL_TX_TUNNEL_VXLAN);
+}
+
+/* Set l2_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l2_len(struct dp_packet *b, int l2_len)
+{
+    b->mbuf.l2_len = l2_len;
+}
+
+/* Set l3_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l3_len(struct dp_packet *b, int l3_len)
+{
+    b->mbuf.l3_len = l3_len;
+}
+
+/* Set l4_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l4_len(struct dp_packet *b, int l4_len)
+{
+    b->mbuf.l4_len = l4_len;
+}
+#else
+/* Mark packet 'b' for VXLAN TCP segmentation offloading. */
+static inline void
+dp_packet_hwol_set_vxlan_tcp_seg(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* Check if it is a VXLAN packet */
+static inline bool
+dp_packet_hwol_is_vxlan_tcp_seg(struct dp_packet *b OVS_UNUSED)
+{
+}
+
+/* Set l2_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l2_len(struct dp_packet *b OVS_UNUSED,
+                          int l2_len OVS_UNUSED)
+{
+}
+
+/* Set l3_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l3_len(struct dp_packet *b OVS_UNUSED,
+                          int l3_len OVS_UNUSED)
+{
+}
+
+/* Set l4_len for the packet 'b' */
+static inline void
+dp_packet_hwol_set_l4_len(struct dp_packet *b OVS_UNUSED,
+                          int l4_len OVS_UNUSED)
+{
+}
+#endif /* DPDK_NETDEV */
 
 static inline bool
 dp_packet_ip_checksum_valid(const struct dp_packet *p)

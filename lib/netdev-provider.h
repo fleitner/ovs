@@ -43,6 +43,7 @@ enum netdev_ol_flags {
     NETDEV_TX_OFFLOAD_UDP_CKSUM = 1 << 2,
     NETDEV_TX_OFFLOAD_SCTP_CKSUM = 1 << 3,
     NETDEV_TX_OFFLOAD_TCP_TSO = 1 << 4,
+    NETDEV_TX_OFFLOAD_VXLAN_TSO = 1 << 5,
 };
 
 /* A network device (e.g. an Ethernet device).

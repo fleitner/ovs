@@ -6508,6 +6508,8 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
     struct eth_header *eth_hdr;
     ovs_be16 eth_type;
     int l2_len;
+    int l3_len = 0;
+    int l4_len = 0;
 
     eth_hdr = dp_packet_at(b, 0, ETH_HEADER_LEN);
     if (!eth_hdr) {
@@ -6527,6 +6529,8 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
         l2_len += VLAN_HEADER_LEN;
     }
 
+    dp_packet_hwol_set_l2_len(b, l2_len);
+
     if (eth_type == htons(ETH_TYPE_IP)) {
         struct ip_header *ip_hdr = dp_packet_at(b, l2_len, IP_HEADER_LEN);
 
@@ -6534,6 +6538,7 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
             return -EINVAL;
         }
 
+        l3_len = IP_HEADER_LEN;
         *l4proto = ip_hdr->ip_proto;
         dp_packet_hwol_set_tx_ipv4(b);
     } else if (eth_type == htons(ETH_TYPE_IPV6)) {
@@ -6544,8 +6549,23 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
             return -EINVAL;
         }
 
+        l3_len = IPV6_HEADER_LEN;
         *l4proto = nh6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
         dp_packet_hwol_set_tx_ipv6(b);
+    }
+
+    dp_packet_hwol_set_l3_len(b, l3_len);
+
+    if (*l4proto == IPPROTO_TCP) {
+        struct tcp_header *tcp_hdr =  dp_packet_at(b, l2_len + l3_len,
+                                          sizeof(struct tcp_header));
+
+        if (!tcp_hdr) {
+            return -EINVAL;
+        }
+
+        l4_len = TCP_OFFSET(tcp_hdr->tcp_ctl) * 4;
+        dp_packet_hwol_set_l4_len(b, l4_len);
     }
 
     return 0;
