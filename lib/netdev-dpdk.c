@@ -185,6 +185,7 @@ static const struct rte_eth_conf port_conf = {
 static int new_device(int vid);
 static void destroy_device(int vid);
 static int vring_state_changed(int vid, uint16_t queue_id, int enable);
+static int vhost_features_changed(int vid, uint64_t features);
 static void destroy_connection(int vid);
 static void vhost_guest_notified(int vid);
 
@@ -193,7 +194,7 @@ static const struct vhost_device_ops virtio_net_device_ops =
     .new_device =  new_device,
     .destroy_device = destroy_device,
     .vring_state_changed = vring_state_changed,
-    .features_changed = NULL,
+    .features_changed = vhost_features_changed,
     .new_connection = NULL,
     .destroy_connection = destroy_connection,
     .guest_notified = vhost_guest_notified,
@@ -4040,6 +4041,38 @@ destroy_device(int vid)
     } else {
         VLOG_INFO("vHost Device '%s' not found", ifname);
     }
+}
+
+static int
+vhost_features_changed(int vid, uint64_t features)
+{
+    struct netdev_dpdk *dev;
+    bool exists = false;
+    char ifname[IF_NAME_SZ];
+
+    rte_vhost_get_ifname(vid, ifname, sizeof ifname);
+
+    ovs_mutex_lock(&dpdk_mutex);
+    LIST_FOR_EACH (dev, list_node, &dpdk_list) {
+        ovs_mutex_lock(&dev->mutex);
+        if (nullable_string_is_equal(ifname, dev->vhost_id)) {
+            exists = true;
+            ovs_mutex_unlock(&dev->mutex);
+            break;
+        }
+        ovs_mutex_unlock(&dev->mutex);
+    }
+    ovs_mutex_unlock(&dpdk_mutex);
+
+    if (exists) {
+        VLOG_INFO("Features of vhost device '%s' "
+                  "changed %lx", ifname, features);
+    } else {
+        VLOG_INFO("vHost Device '%s' not found", ifname);
+        return -1;
+    }
+
+    return 0;
 }
 
 static int
