@@ -29,6 +29,7 @@ void id_pool_destroy(struct id_pool *);
 bool id_pool_alloc_id(struct id_pool *, uint32_t *id);
 void id_pool_free_id(struct id_pool *, uint32_t id);
 void id_pool_add(struct id_pool *, uint32_t id);
+bool id_pool_has_id(struct id_pool *, uint32_t id);
 
 /*
  * ID pool.

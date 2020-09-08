@@ -93,6 +93,16 @@ id_pool_find(struct id_pool *pool, uint32_t id)
     return NULL;
 }
 
+bool
+id_pool_has_id(struct id_pool *pool, uint32_t id)
+{
+    if (!id_pool_find(pool, id)) {
+        return false;
+    }
+
+    return true;
+}
+
 void
 id_pool_add(struct id_pool *pool, uint32_t id)
 {
