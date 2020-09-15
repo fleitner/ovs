@@ -513,7 +513,7 @@
           when flow count is larger than EMC capacity.
         </p>
         <p>
-          Defaults to false but can be changed at any time.
+          Defaults to true but can be changed at any time.
         </p>
       </column>
 
@@ -3296,7 +3296,7 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
           key="emc-insert-inv-prob"/> will have effect on this interface.
         </p>
         <p>
-          Defaults to true.
+          Defaults to false.
         </p>
       </column>
     </group>

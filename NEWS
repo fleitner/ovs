@@ -1,6 +1,9 @@
 Post-v2.14.0
 ---------------------
 
+   - DPDK:
+     * The SMC cache is enabled by default.
+     * The EMC cache is disabled by default.
 
 v2.14.0 - 17 Aug 2020
 ---------------------

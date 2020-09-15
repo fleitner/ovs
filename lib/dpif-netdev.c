@@ -2079,7 +2079,7 @@ port_create(const char *devname, const char *type,
     port->netdev = netdev;
     port->type = xstrdup(type);
     port->sf = NULL;
-    port->emc_enabled = true;
+    port->emc_enabled = false;
     port->need_reconfigure = true;
     ovs_mutex_init(&port->txq_used_mutex);
 
@@ -4305,7 +4305,7 @@ dpif_netdev_set_config(struct dpif *dpif, const struct smap *other_config)
         }
     }
 
-    bool smc_enable = smap_get_bool(other_config, "smc-enable", false);
+    bool smc_enable = smap_get_bool(other_config, "smc-enable", true);
     bool cur_smc;
     atomic_read_relaxed(&dp->smc_enable_db, &cur_smc);
     if (smc_enable != cur_smc) {
@@ -4440,7 +4440,7 @@ dpif_netdev_port_set_config(struct dpif *dpif, odp_port_t port_no,
     struct dp_netdev_port *port;
     int error = 0;
     const char *affinity_list = smap_get(cfg, "pmd-rxq-affinity");
-    bool emc_enabled = smap_get_bool(cfg, "emc-enable", true);
+    bool emc_enabled = smap_get_bool(cfg, "emc-enable", false);
 
     ovs_mutex_lock(&dp->port_mutex);
     error = get_port_by_number(dp, port_no, &port);

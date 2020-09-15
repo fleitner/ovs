@@ -238,8 +238,8 @@ pmd thread numa_id <cleared> core_id <cleared>:
   packets received: 20
   packet recirculations: 0
   avg. datapath passes per packet: 1.00
-  emc hits: 19
-  smc hits: 0
+  emc hits: 0
+  smc hits: 19
   megaflow hits: 0
   avg. subtable lookups per megaflow hit: 0.00
   miss with success upcall: 1

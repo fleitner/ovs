@@ -130,13 +130,13 @@ SMC cache
 SMC cache or signature match cache is a new cache level after EMC cache.
 The difference between SMC and EMC is SMC only stores a signature of a flow
 thus it is much more memory efficient. With same memory space, EMC can store 8k
-flows while SMC can store 1M flows. When traffic flow count is much larger than
-EMC size, it is generally beneficial to turn off EMC and turn on SMC. It is
-currently turned off by default.
+flows while SMC can store 1M flows. When traffic flow count is small than
+EMC size, it is generally beneficial to turn off SMC and turn on EMC. It is
+currently turned on by default.
 
-To turn on SMC::
+To turn off SMC::
 
-    $ ovs-vsctl --no-wait set Open_vSwitch . other_config:smc-enable=true
+    $ ovs-vsctl --no-wait set Open_vSwitch . other_config:smc-enable=false
 
 Datapath Classifier Performance
 -------------------------------
