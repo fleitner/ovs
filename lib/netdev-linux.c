@@ -6502,60 +6502,11 @@ af_packet_sock(void)
     return sock;
 }
 
-static int
-netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
-{
-    struct eth_header *eth_hdr;
-    ovs_be16 eth_type;
-    int l2_len;
-
-    eth_hdr = dp_packet_at(b, 0, ETH_HEADER_LEN);
-    if (!eth_hdr) {
-        return -EINVAL;
-    }
-
-    l2_len = ETH_HEADER_LEN;
-    eth_type = eth_hdr->eth_type;
-    if (eth_type_vlan(eth_type)) {
-        struct vlan_header *vlan = dp_packet_at(b, l2_len, VLAN_HEADER_LEN);
-
-        if (!vlan) {
-            return -EINVAL;
-        }
-
-        eth_type = vlan->vlan_next_type;
-        l2_len += VLAN_HEADER_LEN;
-    }
-
-    if (eth_type == htons(ETH_TYPE_IP)) {
-        struct ip_header *ip_hdr = dp_packet_at(b, l2_len, IP_HEADER_LEN);
-
-        if (!ip_hdr) {
-            return -EINVAL;
-        }
-
-        *l4proto = ip_hdr->ip_proto;
-        dp_packet_hwol_set_tx_ipv4(b);
-    } else if (eth_type == htons(ETH_TYPE_IPV6)) {
-        struct ovs_16aligned_ip6_hdr *nh6;
-
-        nh6 = dp_packet_at(b, l2_len, IPV6_HEADER_LEN);
-        if (!nh6) {
-            return -EINVAL;
-        }
-
-        *l4proto = nh6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-        dp_packet_hwol_set_tx_ipv6(b);
-    }
-
-    return 0;
-}
-
+/* FIXME: Add a comment. */
 static int
 netdev_linux_parse_vnet_hdr(struct dp_packet *b)
 {
     struct virtio_net_hdr *vnet = dp_packet_pull(b, sizeof *vnet);
-    uint16_t l4proto = 0;
 
     if (OVS_UNLIKELY(!vnet)) {
         return -EINVAL;
@@ -6565,21 +6516,11 @@ netdev_linux_parse_vnet_hdr(struct dp_packet *b)
         return 0;
     }
 
-    if (netdev_linux_parse_l2(b, &l4proto)) {
-        return -EINVAL;
-    }
-
     if (vnet->flags == VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-        if (l4proto == IPPROTO_TCP) {
-            dp_packet_hwol_set_csum_tcp(b);
-        } else if (l4proto == IPPROTO_UDP) {
-            dp_packet_hwol_set_csum_udp(b);
-        } else if (l4proto == IPPROTO_SCTP) {
-            dp_packet_hwol_set_csum_sctp(b);
-        }
+        dp_packet_hwol_set_csum_l4_avail(b);
     }
 
-    if (l4proto && vnet->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
+    if (vnet->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
         uint8_t allowed_mask = VIRTIO_NET_HDR_GSO_TCPV4
                                 | VIRTIO_NET_HDR_GSO_TCPV6
                                 | VIRTIO_NET_HDR_GSO_UDP;

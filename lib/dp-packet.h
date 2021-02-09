@@ -105,6 +105,10 @@ enum dp_packet_offload_mask {
 #define DP_PACKET_OL_RX_L4_CKSUM_MASK (DP_PACKET_OL_RX_L4_CKSUM_GOOD | \
                                        DP_PACKET_OL_RX_L4_CKSUM_BAD)
 
+#define DP_PACKET_OL_TX_L4_AVAIL (DP_PACKET_OL_TX_TCP_CKSUM | \
+                                  DP_PACKET_OL_TX_UDP_CKSUM | \
+                                  DP_PACKET_OL_TX_SCTP_CKSUM)
+
 /* Buffer for holding packet data.  A dp_packet is automatically reallocated
  * as necessary if it grows too large for the available memory.
  * By default the packet type is set to Ethernet (PT_ETH).
@@ -999,11 +1003,28 @@ dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_IPV6;
 }
 
+/* Mark packet 'b' that the L4 requires checksum.
+ * FIXME: Improve comments. */
+static inline void
+dp_packet_hwol_set_csum_l4_avail(struct dp_packet *b)
+{
+    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_L4_AVAIL;
+}
+
+/* FIXME: Improve comments. */
+static inline bool
+dp_packet_hwol_is_csum_l4_avail(struct dp_packet *b)
+{
+    return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_AVAIL) ==
+            DP_PACKET_OL_TX_L4_AVAIL;
+}
+
 /* Mark packet 'b' for TCP checksum offloading.  It implies that either
  * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
 dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
 {
+    *dp_packet_ol_flags_ptr(b) &= ~DP_PACKET_OL_TX_L4_AVAIL;
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_CKSUM;
 }
 
@@ -1012,6 +1033,7 @@ dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
 static inline void
 dp_packet_hwol_set_csum_udp(struct dp_packet *b)
 {
+    *dp_packet_ol_flags_ptr(b) &= ~DP_PACKET_OL_TX_L4_AVAIL;
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_UDP_CKSUM;
 }
 
@@ -1020,6 +1042,7 @@ dp_packet_hwol_set_csum_udp(struct dp_packet *b)
 static inline void
 dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
 {
+    *dp_packet_ol_flags_ptr(b) &= ~DP_PACKET_OL_TX_L4_AVAIL;
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_SCTP_CKSUM;
 }
 
