@@ -980,11 +980,6 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
                 if (dp_packet_hwol_is_csum_l4_avail(packet)) {
                     dp_packet_hwol_set_csum_tcp(packet);
-                    if (dl_type == htons(ETH_TYPE_IP)) {
-                        dp_packet_hwol_set_tx_ipv4(packet);
-                    } else if (dl_type == htons(ETH_TYPE_IPV6)) {
-                        dp_packet_hwol_set_tx_ipv6(packet);
-                    }
                 }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_UDP)) {
@@ -997,11 +992,6 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
                 if (dp_packet_hwol_is_csum_l4_avail(packet)) {
                     dp_packet_hwol_set_csum_udp(packet);
-                    if (dl_type == htons(ETH_TYPE_IP)) {
-                        dp_packet_hwol_set_tx_ipv4(packet);
-                    } else if (dl_type == htons(ETH_TYPE_IPV6)) {
-                        dp_packet_hwol_set_tx_ipv6(packet);
-                    }
                 }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_SCTP)) {
@@ -1014,11 +1004,6 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
                 if (dp_packet_hwol_is_csum_l4_avail(packet)) {
                     dp_packet_hwol_set_csum_sctp(packet);
-                    if (dl_type == htons(ETH_TYPE_IP)) {
-                        dp_packet_hwol_set_tx_ipv4(packet);
-                    } else if (dl_type == htons(ETH_TYPE_IPV6)) {
-                        dp_packet_hwol_set_tx_ipv6(packet);
-                    }
                 }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_ICMP)) {
