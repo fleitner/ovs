@@ -88,7 +88,7 @@ netdev_tnl_ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
 
         ovs_be32 ip_src, ip_dst;
 
-        if (OVS_UNLIKELY(!dp_packet_ip_checksum_valid(packet))) {
+        if (OVS_UNLIKELY(!dp_packet_ip_csum_valid(packet))) {
             if (csum(ip, IP_IHL(ip->ip_ihl_ver) * 4)) {
                 VLOG_WARN_RL(&err_rl, "ip packet has invalid checksum");
                 return NULL;
@@ -190,7 +190,7 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
     }
 
     if (udp->udp_csum) {
-        if (OVS_UNLIKELY(!dp_packet_l4_checksum_valid(packet))) {
+        if (OVS_UNLIKELY(!dp_packet_l4_csum_valid(packet))) {
             uint32_t csum;
             if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {
                 csum = packet_csum_pseudoheader6(dp_packet_l3(packet));

@@ -954,7 +954,7 @@ dp_packet_hwol_l4_mask(const struct dp_packet *b)
 
 /* Return true if the packet 'b' requested L4 checksum offload. */
 static inline bool
-dp_packet_hwol_tx_l4_checksum(const struct dp_packet *b)
+dp_packet_hwol_tx_l4_csum(const struct dp_packet *b)
 {
     return !!dp_packet_hwol_l4_mask(b);
 }
@@ -1045,28 +1045,28 @@ dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
 }
 
 static inline bool
-dp_packet_ip_checksum_valid(const struct dp_packet *p)
+dp_packet_ip_csum_valid(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_IP_CKSUM_MASK) ==
             DP_PACKET_OL_RX_IP_CKSUM_GOOD;
 }
 
 static inline bool
-dp_packet_ip_checksum_bad(const struct dp_packet *p)
+dp_packet_ip_csum_bad(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_IP_CKSUM_MASK) ==
             DP_PACKET_OL_RX_IP_CKSUM_BAD;
 }
 
 static inline bool
-dp_packet_l4_checksum_valid(const struct dp_packet *p)
+dp_packet_l4_csum_valid(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CKSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CKSUM_GOOD;
 }
 
 static inline bool
-dp_packet_l4_checksum_bad(const struct dp_packet *p)
+dp_packet_l4_csum_bad(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CKSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CKSUM_BAD;
