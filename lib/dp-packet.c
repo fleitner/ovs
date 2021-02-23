@@ -21,6 +21,7 @@
 #include "dp-packet.h"
 #include "netdev-afxdp.h"
 #include "netdev-dpdk.h"
+#include "netdev-provider.h"
 #include "openvswitch/dynamic-string.h"
 #include "util.h"
 
@@ -505,4 +506,15 @@ dp_packet_resize_l2(struct dp_packet *p, int increment)
     dp_packet_resize_l2_5(p, increment);
     dp_packet_adjust_layer_offset(&p->l2_5_ofs, increment);
     return dp_packet_data(p);
+}
+
+/* Checks if the packet 'p' is compatible with netdev_ol_flags 'flags'
+ * and if not, update the packet with the software fall back. */
+void
+dp_packet_ol_send_prepare(struct dp_packet *p, const uint64_t flags) {
+    if (!dp_packet_ol_ip_csum_good(p) && dp_packet_ol_tx_ip_csum(p)
+        && !(flags & NETDEV_OFFLOAD_TX_IPV4_CSUM)) {
+        dp_packet_ip_set_header_csum(p);
+        dp_packet_ol_set_ip_csum_good(p);
+    }
 }

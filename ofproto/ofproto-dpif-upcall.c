@@ -1487,6 +1487,10 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
                 break;
             }
 
+            /* The packet is going to be encapsulated and sent to
+             * the controller. */
+            dp_packet_ol_send_prepare(packet, 0);
+
             const struct frozen_state *state = &recirc_node->state;
 
             struct ofproto_async_msg *am = xmalloc(sizeof *am);

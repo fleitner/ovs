@@ -50,6 +50,7 @@ DOC_SOURCE = \
 	Documentation/topics/integration.rst \
 	Documentation/topics/language-bindings.rst \
 	Documentation/topics/networking-namespaces.rst \
+	Documentation/topics/nic-offloads.rst \
 	Documentation/topics/openflow.rst \
 	Documentation/topics/ovs-extensions.rst \
 	Documentation/topics/ovsdb-replication.rst \

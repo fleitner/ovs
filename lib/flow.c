@@ -874,6 +874,12 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
         nw_proto = nh->ip_proto;
         nw_frag = ipv4_get_nw_frag(nh);
         data_pull(&data, &size, ip_len);
+        dp_packet_ol_set_tx_ipv4(packet);
+        /* Only enable IP csum offloading if the csum is already verified,
+         * otherwise a bad packet would be fixed by the egress device. */
+        if (dp_packet_ol_ip_csum_good(packet)) {
+            dp_packet_ol_set_tx_ip_csum(packet);
+        }
     } else if (dl_type == htons(ETH_TYPE_IPV6)) {
         const struct ovs_16aligned_ip6_hdr *nh = data;
         ovs_be32 tc_flow;
@@ -884,6 +890,7 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
         }
         data_pull(&data, &size, sizeof *nh);
 
+        dp_packet_ol_set_tx_ipv6(packet);
         plen = ntohs(nh->ip6_plen);
         dp_packet_set_l2_pad_size(packet, size - plen);
         size = plen;   /* Never pull padding. */
@@ -3151,9 +3158,12 @@ packet_expand(struct dp_packet *p, const struct flow *flow, size_t size)
             struct ip_header *ip = dp_packet_l3(p);
 
             ip->ip_tot_len = htons(p->l4_ofs - p->l3_ofs + l4_len);
-            ip->ip_csum = 0;
-            ip->ip_csum = csum(ip, sizeof *ip);
-
+            if (dp_packet_ol_tx_ip_csum(p)) {
+                dp_packet_ol_reset_ip_csum_good(p);
+            } else {
+                dp_packet_ip_set_header_csum(p);
+                dp_packet_ol_set_ip_csum_good(p);
+            }
             pseudo_hdr_csum = packet_csum_pseudoheader(ip);
         } else { /* ETH_TYPE_IPV6 */
             struct ovs_16aligned_ip6_hdr *nh = dp_packet_l3(p);
@@ -3242,7 +3252,7 @@ flow_compose(struct dp_packet *p, const struct flow *flow,
         ip->ip_tot_len = htons(p->l4_ofs - p->l3_ofs + l4_len);
         /* Checksum has already been zeroed by put_zeros call. */
         ip->ip_csum = csum(ip, sizeof *ip);
-
+        dp_packet_ol_set_ip_csum_good(p);
         pseudo_hdr_csum = packet_csum_pseudoheader(ip);
         flow_compose_l4_csum(p, flow, pseudo_hdr_csum);
     } else if (flow->dl_type == htons(ETH_TYPE_IPV6)) {

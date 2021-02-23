@@ -396,8 +396,9 @@ enum dpdk_hw_ol_features {
     NETDEV_RX_CHECKSUM_OFFLOAD = 1 << 0,
     NETDEV_RX_HW_CRC_STRIP = 1 << 1,
     NETDEV_RX_HW_SCATTER = 1 << 2,
-    NETDEV_TX_TSO_OFFLOAD = 1 << 3,
-    NETDEV_TX_SCTP_CHECKSUM_OFFLOAD = 1 << 4,
+    NETDEV_TX_IPV4_CKSUM_OFFLOAD = 1 << 3,
+    NETDEV_TX_TSO_OFFLOAD = 1 << 4,
+    NETDEV_TX_SCTP_CHECKSUM_OFFLOAD = 1 << 5,
 };
 
 /*
@@ -997,6 +998,10 @@ dpdk_eth_dev_port_config(struct netdev_dpdk *dev, int n_rxq, int n_txq)
         }
     }
 
+    if (dev->hw_ol_features & NETDEV_TX_IPV4_CKSUM_OFFLOAD) {
+        conf.rxmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+    }
+
     /* Limit configured rss hash functions to only those supported
      * by the eth device. */
     conf.rx_adv_conf.rss_conf.rss_hf &= info.flow_type_rss_offloads;
@@ -1141,6 +1146,10 @@ dpdk_eth_dev_init(struct netdev_dpdk *dev)
             VLOG_WARN("%s: Tx TSO offload is not supported.",
                       netdev_get_name(&dev->up));
         }
+    }
+
+    if (info.rx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+        dev->hw_ol_features |= NETDEV_TX_IPV4_CKSUM_OFFLOAD;
     }
 
     n_rxq = MIN(info.max_rx_queues, dev->up.n_rxq);
@@ -5014,6 +5023,10 @@ netdev_dpdk_reconfigure(struct netdev *netdev)
         if (dev->hw_ol_features & NETDEV_TX_SCTP_CHECKSUM_OFFLOAD) {
             netdev->ol_flags |= NETDEV_OFFLOAD_TX_SCTP_CSUM;
         }
+    }
+
+    if (dev->hw_ol_features & NETDEV_TX_IPV4_CKSUM_OFFLOAD) {
+        netdev->ol_flags |= NETDEV_OFFLOAD_TX_IPV4_CSUM;
     }
 
     /* If both requested and actual hwaddr were previously
