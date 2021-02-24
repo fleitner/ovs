@@ -1045,7 +1045,7 @@ dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
 }
 
 static inline bool
-dp_packet_ip_csum_valid(const struct dp_packet *p)
+dp_packet_ip_csum_good(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_IP_CSUM_MASK) ==
             DP_PACKET_OL_RX_IP_CSUM_GOOD;
@@ -1059,7 +1059,7 @@ dp_packet_ip_csum_bad(const struct dp_packet *p)
 }
 
 static inline bool
-dp_packet_l4_csum_valid(const struct dp_packet *p)
+dp_packet_l4_csum_good(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CSUM_GOOD;

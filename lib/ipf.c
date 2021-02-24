@@ -607,7 +607,7 @@ ipf_is_valid_v4_frag(struct ipf *ipf, struct dp_packet *pkt)
         goto invalid_pkt;
     }
 
-    if (OVS_UNLIKELY(!dp_packet_ip_csum_valid(pkt)
+    if (OVS_UNLIKELY(!dp_packet_ip_csum_good(pkt)
                      && !dp_packet_hwol_is_ipv4(pkt)
                      && csum(l3, ip_hdr_len) != 0)) {
         goto invalid_pkt;

@@ -2052,7 +2052,7 @@ conn_key_extract(struct conntrack *ct, struct dp_packet *pkt, ovs_be16 dl_type,
         if (hwol_bad_l3_csum) {
             ok = false;
         } else {
-            bool hwol_good_l3_csum = dp_packet_ip_csum_valid(pkt)
+            bool hwol_good_l3_csum = dp_packet_ip_csum_good(pkt)
                                      || dp_packet_hwol_is_ipv4(pkt);
             /* Validate the checksum only when hwol is not supported. */
             ok = extract_l3_ipv4(&ctx->key, l3, dp_packet_l3_size(pkt), NULL,
@@ -2067,7 +2067,7 @@ conn_key_extract(struct conntrack *ct, struct dp_packet *pkt, ovs_be16 dl_type,
     if (ok) {
         bool hwol_bad_l4_csum = dp_packet_l4_csum_bad(pkt);
         if (!hwol_bad_l4_csum) {
-            bool  hwol_good_l4_csum = dp_packet_l4_csum_valid(pkt)
+            bool  hwol_good_l4_csum = dp_packet_l4_csum_good(pkt)
                                       || dp_packet_hwol_tx_l4_csum(pkt);
             /* Validate the checksum only when hwol is not supported. */
             if (extract_l4(&ctx->key, l4, dp_packet_l4_size(pkt),
