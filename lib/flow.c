@@ -985,6 +985,12 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, tp_dst, tcp->tcp_dst);
                 miniflow_push_be16(mf, ct_tp_src, ct_tp_src);
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
+                dp_packet_ol_vnet_csum_check(packet, packet->l4_ofs,
+                              __builtin_offsetof(struct tcp_header, tcp_csum));
+                if (dp_packet_ol_l4_csum_good(packet)
+                    || dp_packet_ol_l4_csum_none(packet)) {
+                    dp_packet_ol_set_tx_tcp_csum(packet);
+                }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_UDP)) {
             if (OVS_LIKELY(size >= UDP_HEADER_LEN)) {
@@ -994,6 +1000,12 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, tp_dst, udp->udp_dst);
                 miniflow_push_be16(mf, ct_tp_src, ct_tp_src);
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
+                dp_packet_ol_vnet_csum_check(packet, packet->l4_ofs,
+                              __builtin_offsetof(struct udp_header, udp_csum));
+                if (dp_packet_ol_l4_csum_good(packet)
+                    || dp_packet_ol_l4_csum_none(packet)) {
+                    dp_packet_ol_set_tx_udp_csum(packet);
+                }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_SCTP)) {
             if (OVS_LIKELY(size >= SCTP_HEADER_LEN)) {
@@ -1003,6 +1015,12 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, tp_dst, sctp->sctp_dst);
                 miniflow_push_be16(mf, ct_tp_src, ct_tp_src);
                 miniflow_push_be16(mf, ct_tp_dst, ct_tp_dst);
+                dp_packet_ol_vnet_csum_check(packet, packet->l4_ofs,
+                            __builtin_offsetof(struct sctp_header, sctp_csum));
+                if (dp_packet_ol_l4_csum_good(packet)
+                    || dp_packet_ol_l4_csum_none(packet)) {
+                    dp_packet_ol_set_tx_sctp_csum(packet);
+                }
             }
         } else if (OVS_LIKELY(nw_proto == IPPROTO_ICMP)) {
             if (OVS_LIKELY(size >= ICMP_HEADER_LEN)) {
@@ -3102,6 +3120,7 @@ flow_compose_l4_csum(struct dp_packet *p, const struct flow *flow,
             tcp->tcp_csum = 0;
             tcp->tcp_csum = csum_finish(csum_continue(pseudo_hdr_csum,
                                                       tcp, l4_len));
+            dp_packet_ol_set_l4_csum_good(p);
         } else if (flow->nw_proto == IPPROTO_UDP) {
             struct udp_header *udp = dp_packet_l4(p);
 
@@ -3111,6 +3130,8 @@ flow_compose_l4_csum(struct dp_packet *p, const struct flow *flow,
             if (!udp->udp_csum) {
                 udp->udp_csum = htons(0xffff);
             }
+
+            dp_packet_ol_set_l4_csum_good(p);
         } else if (flow->nw_proto == IPPROTO_ICMP) {
             struct icmp_header *icmp = dp_packet_l4(p);
 

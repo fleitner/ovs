@@ -215,7 +215,7 @@ struct upcall {
     enum odp_key_fitness fitness;  /* Fitness of 'flow' relative to ODP key. */
     const ovs_u128 *ufid;          /* Unique identifier for 'flow'. */
     unsigned pmd_id;               /* Datapath poll mode driver id. */
-    const struct dp_packet *packet;   /* Packet associated with this upcall. */
+    struct dp_packet *packet;      /* Packet associated with this upcall. */
     ofp_port_t ofp_in_port;        /* OpenFlow in port, or OFPP_NONE. */
     uint16_t mru;                  /* If !0, Maximum receive unit of
                                       fragmented IP packet */
@@ -395,7 +395,7 @@ static void delete_op_init(struct udpif *udpif, struct ukey_op *op,
                            struct udpif_key *ukey);
 
 static int upcall_receive(struct upcall *, const struct dpif_backer *,
-                          const struct dp_packet *packet, enum dpif_upcall_type,
+                          struct dp_packet *packet, enum dpif_upcall_type,
                           const struct nlattr *userdata, const struct flow *,
                           const unsigned int mru,
                           const ovs_u128 *ufid, const unsigned pmd_id);
@@ -1103,7 +1103,7 @@ compose_slow_path(struct udpif *udpif, struct xlate_out *xout,
  * since the 'upcall->put_actions' remains uninitialized. */
 static int
 upcall_receive(struct upcall *upcall, const struct dpif_backer *backer,
-               const struct dp_packet *packet, enum dpif_upcall_type type,
+               struct dp_packet *packet, enum dpif_upcall_type type,
                const struct nlattr *userdata, const struct flow *flow,
                const unsigned int mru,
                const ovs_u128 *ufid, const unsigned pmd_id)
@@ -1299,7 +1299,7 @@ should_install_flow(struct udpif *udpif, struct upcall *upcall)
 }
 
 static int
-upcall_cb(const struct dp_packet *packet, const struct flow *flow, ovs_u128 *ufid,
+upcall_cb(struct dp_packet *packet, const struct flow *flow, ovs_u128 *ufid,
           unsigned pmd_id, enum dpif_upcall_type type,
           const struct nlattr *userdata, struct ofpbuf *actions,
           struct flow_wildcards *wc, struct ofpbuf *put_actions, void *aux)
@@ -1409,7 +1409,7 @@ static int
 process_upcall(struct udpif *udpif, struct upcall *upcall,
                struct ofpbuf *odp_actions, struct flow_wildcards *wc)
 {
-    const struct dp_packet *packet = upcall->packet;
+    struct dp_packet *packet = upcall->packet;
     const struct flow *flow = upcall->flow;
     size_t actions_len = 0;
 

@@ -38,6 +38,9 @@ dp_packet_init__(struct dp_packet *p, size_t allocated, enum dp_packet_source so
     dp_packet_init_specific(p);
     /* By default assume the packet type to be Ethernet. */
     p->packet_type = htonl(PT_ETH);
+    /* Reset csum start and offset. */
+    p->csum_start = 0;
+    p->csum_offset = 0;
 }
 
 static void
@@ -188,7 +191,7 @@ dp_packet_clone_with_headroom(const struct dp_packet *p, size_t headroom)
                                                     dp_packet_size(p),
                                                     headroom);
     /* Copy the following fields into the returned buffer: l2_pad_size,
-     * l2_5_ofs, l3_ofs, l4_ofs, cutlen, packet_type and md. */
+     * l2_5_ofs, l3_ofs, ..., cutlen, packet_type and md. */
     memcpy(&new_buffer->l2_pad_size, &p->l2_pad_size,
             sizeof(struct dp_packet) -
             offsetof(struct dp_packet, l2_pad_size));
@@ -516,5 +519,23 @@ dp_packet_ol_send_prepare(struct dp_packet *p, const uint64_t flags) {
         && !(flags & NETDEV_OFFLOAD_TX_IPV4_CSUM)) {
         dp_packet_ip_set_header_csum(p);
         dp_packet_ol_set_ip_csum_good(p);
+    }
+
+    if (dp_packet_ol_l4_csum_good(p) || !dp_packet_ol_tx_l4_csum(p)) {
+        return;
+    }
+
+    if (dp_packet_ol_tx_tcp_csum(p)
+        && !(flags & NETDEV_OFFLOAD_TX_TCP_CSUM)) {
+        packet_tcp_complete_csum(p);
+        dp_packet_ol_set_l4_csum_good(p);
+    } else if (dp_packet_ol_tx_udp_csum(p)
+        && !(flags & NETDEV_OFFLOAD_TX_UDP_CSUM)) {
+        packet_udp_complete_csum(p);
+        dp_packet_ol_set_l4_csum_good(p);
+    } else if (!(flags & NETDEV_OFFLOAD_TX_SCTP_CSUM)
+        && dp_packet_ol_tx_sctp_csum(p)) {
+        packet_sctp_complete_csum(p);
+        dp_packet_ol_set_l4_csum_good(p);
     }
 }

@@ -1315,18 +1315,21 @@ netdev_linux_batch_rxq_recv_sock(struct netdev_rxq_linux *rx, int mtu,
             pkt = buffers[i];
          }
 
-        if (virtio_net_hdr_size && netdev_linux_parse_vnet_hdr(pkt)) {
-            struct netdev *netdev_ = netdev_rxq_get_netdev(&rx->up);
-            struct netdev_linux *netdev = netdev_linux_cast(netdev_);
+        if (virtio_net_hdr_size) {
+            int ret = netdev_linux_parse_vnet_hdr(pkt);
+            if (OVS_UNLIKELY(ret)) {
+                struct netdev *netdev_ = netdev_rxq_get_netdev(&rx->up);
+                struct netdev_linux *netdev = netdev_linux_cast(netdev_);
 
-            /* Unexpected error situation: the virtio header is not present
-             * or corrupted. Drop the packet but continue in case next ones
-             * are correct. */
-            dp_packet_delete(pkt);
-            netdev->rx_dropped += 1;
-            VLOG_WARN_RL(&rl, "%s: Dropped packet: Invalid virtio net header",
-                         netdev_get_name(netdev_));
-            continue;
+                /* Unexpected error situation: the virtio header is not present
+                 * or corrupted or contains unsupported features. Drop the packet
+                 * but continue in case next ones are correct. */
+                dp_packet_delete(pkt);
+                netdev->rx_dropped += 1;
+                VLOG_WARN_RL(&rl, "%s: Dropped packet: %s",
+                             netdev_get_name(netdev_), ovs_strerror(ret));
+                continue;
+            }
         }
 
         for (cmsg = CMSG_FIRSTHDR(&mmsgs[i].msg_hdr); cmsg;
@@ -6503,96 +6506,56 @@ af_packet_sock(void)
     return sock;
 }
 
-static int
-netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
-{
-    struct eth_header *eth_hdr;
-    ovs_be16 eth_type;
-    int l2_len;
-
-    eth_hdr = dp_packet_at(b, 0, ETH_HEADER_LEN);
-    if (!eth_hdr) {
-        return -EINVAL;
-    }
-
-    l2_len = ETH_HEADER_LEN;
-    eth_type = eth_hdr->eth_type;
-    if (eth_type_vlan(eth_type)) {
-        struct vlan_header *vlan = dp_packet_at(b, l2_len, VLAN_HEADER_LEN);
-
-        if (!vlan) {
-            return -EINVAL;
-        }
-
-        eth_type = vlan->vlan_next_type;
-        l2_len += VLAN_HEADER_LEN;
-    }
-
-    if (eth_type == htons(ETH_TYPE_IP)) {
-        struct ip_header *ip_hdr = dp_packet_at(b, l2_len, IP_HEADER_LEN);
-
-        if (!ip_hdr) {
-            return -EINVAL;
-        }
-
-        *l4proto = ip_hdr->ip_proto;
-        dp_packet_ol_set_tx_ipv4(b);
-    } else if (eth_type == htons(ETH_TYPE_IPV6)) {
-        struct ovs_16aligned_ip6_hdr *nh6;
-
-        nh6 = dp_packet_at(b, l2_len, IPV6_HEADER_LEN);
-        if (!nh6) {
-            return -EINVAL;
-        }
-
-        *l4proto = nh6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-        dp_packet_ol_set_tx_ipv6(b);
-    }
-
-    return 0;
-}
-
+/* Initializes packet 'b' with features enabled in the prepended
+ * struct virtio_net_hdr.  Returns 0 if successful, otherwise a
+ * positive errno value. */
 static int
 netdev_linux_parse_vnet_hdr(struct dp_packet *b)
 {
     struct virtio_net_hdr *vnet = dp_packet_pull(b, sizeof *vnet);
-    uint16_t l4proto = 0;
 
     if (OVS_UNLIKELY(!vnet)) {
-        return -EINVAL;
+        return EINVAL;
     }
 
     if (vnet->flags == 0 && vnet->gso_type == VIRTIO_NET_HDR_GSO_NONE) {
         return 0;
     }
 
-    if (netdev_linux_parse_l2(b, &l4proto)) {
-        return -EINVAL;
-    }
-
     if (vnet->flags == VIRTIO_NET_HDR_F_NEEDS_CSUM) {
-        if (l4proto == IPPROTO_TCP) {
-            dp_packet_ol_set_tx_tcp_csum(b);
-        } else if (l4proto == IPPROTO_UDP) {
-            dp_packet_ol_set_tx_udp_csum(b);
-        } else if (l4proto == IPPROTO_SCTP) {
-            dp_packet_ol_set_tx_sctp_csum(b);
-        }
+        /* The packet has offloaded checksum. However, there is no
+         * additional information like the protocol used. Note the
+         * checksum starting point and offset in the packet to be
+         * verified when the packet headers are parsed. */
+        b->csum_start = vnet->csum_start;
+        b->csum_offset = vnet->csum_offset;
+    } else {
+        b->csum_start = 0;
+        b->csum_offset = 0;
     }
 
-    if (l4proto && vnet->gso_type != VIRTIO_NET_HDR_GSO_NONE) {
-        uint8_t allowed_mask = VIRTIO_NET_HDR_GSO_TCPV4
-                                | VIRTIO_NET_HDR_GSO_TCPV6
-                                | VIRTIO_NET_HDR_GSO_UDP;
-        uint8_t type = vnet->gso_type & allowed_mask;
-
-        if (type == VIRTIO_NET_HDR_GSO_TCPV4
-            || type == VIRTIO_NET_HDR_GSO_TCPV6) {
-            dp_packet_ol_set_tcp_seg(b);
-        }
+    int ret = 0;
+    switch (vnet->gso_type) {
+    case VIRTIO_NET_HDR_GSO_TCPV4:
+    case VIRTIO_NET_HDR_GSO_TCPV6:
+        /* The packet has offloaded TCP segmentation. The gso_size is given
+         * and needs to be respected. */
+        dp_packet_ol_set_tcp_seg(b);
+        break;
+    case VIRTIO_NET_HDR_GSO_UDP:
+        /* UFO is not supported. */
+        VLOG_WARN_RL(&rl, "Received an unsupported packet with UFO enabled.");
+        ret = ENOTSUP;
+        break;
+    case VIRTIO_NET_HDR_GSO_NONE:
+        break;
+    default:
+        ret = ENOTSUP;
+        VLOG_WARN_RL(&rl, "Received an unsupported packet with GSO type: 0x%x",
+                     vnet->gso_type);
     }
 
-    return 0;
+    return ret;
 }
 
 static void
@@ -6608,7 +6571,7 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
         vnet->gso_size = (OVS_FORCE __virtio16)(mtu - hdr_len);
         if (dp_packet_ol_tx_ipv4(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
-        } else {
+        } else if (dp_packet_ol_tx_ipv6(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
         }
 
@@ -6618,8 +6581,7 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
 
     if (dp_packet_ol_tx_l4_csum(b)) {
         vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
-        vnet->csum_start = (OVS_FORCE __virtio16)((char *)dp_packet_l4(b)
-                                                  - (char *)dp_packet_eth(b));
+        vnet->csum_start = (OVS_FORCE __virtio16)b->l4_ofs;
 
         if (dp_packet_ol_tx_tcp_csum(b)) {
             vnet->csum_offset = (OVS_FORCE __virtio16) __builtin_offsetof(
@@ -6632,6 +6594,8 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
                                     struct sctp_header, sctp_csum);
         } else {
             VLOG_WARN_RL(&rl, "Unsupported L4 protocol");
+            vnet->csum_start = vnet->csum_offset = (OVS_FORCE __virtio16)0;
+            vnet->flags = 0;
         }
     }
 }

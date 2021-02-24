@@ -804,36 +804,15 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
      * netdev to decide what would be the best to do.
      * Provide a software fallback in case the device doesn't support IP csum
      * offloading. Note: Encapsulated packet must have the inner IP header
+     * csum already calculated.
+     * Packet with L4 csum offloading enabled was received with verified csum.
+     * Leave the L4 csum offloading enabled even with good checksum for the
+     * netdev to decide what would be the best to do.
+     * Netdev that requires pseudo header csum needs to calculate that.
+     * Provide a software fallback in case the netdev doesn't support L4 csum
+     * offloading. Note: Encapsulated packet must have the inner L4 header
      * csum already calculated. */
     dp_packet_ol_send_prepare(packet, netdev_flags);
-
-    if (dp_packet_ol_tx_l4_csum(packet)) {
-        if (dp_packet_ol_tx_tcp_csum(packet)) {
-            if (!(netdev_flags & NETDEV_OFFLOAD_TX_TCP_CSUM)) {
-                /* Fall back to TCP csum in software. */
-                VLOG_ERR_BUF(errormsg, "No TCP checksum support");
-                return false;
-            }
-        } else if (dp_packet_ol_tx_udp_csum(packet)) {
-            if (!(netdev_flags & NETDEV_OFFLOAD_TX_UDP_CSUM)) {
-                /* Fall back to UDP csum in software. */
-                VLOG_ERR_BUF(errormsg, "No UDP checksum support");
-                return false;
-            }
-        } else if (dp_packet_ol_tx_sctp_csum(packet)) {
-            if (!(netdev_flags & NETDEV_OFFLOAD_TX_SCTP_CSUM)) {
-                /* Fall back to SCTP csum in software. */
-                VLOG_ERR_BUF(errormsg, "No SCTP checksum support");
-                return false;
-            }
-        } else {
-            uint64_t ol_flags = *dp_packet_ol_flags_ptr(packet);
-            VLOG_ERR_BUF(errormsg, "No L4 checksum support: "
-                         "offload mask: %"PRIu64, ol_flags);
-            return false;
-        }
-    }
-
     return true;
 }
 
@@ -966,11 +945,10 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-        if (OVS_UNLIKELY(dp_packet_ol_tcp_seg(packet)
-                         || dp_packet_ol_tx_l4_csum(packet))) {
+        if (OVS_UNLIKELY(dp_packet_ol_tcp_seg(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
-            VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
+            VLOG_WARN_RL(&rl, "%s: Tunneling packets with TSO offloading is "
                          "not supported: packet dropped",
                          netdev_get_name(netdev));
         } else {

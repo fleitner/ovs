@@ -858,7 +858,7 @@ void dpif_register_dp_purge_cb(struct dpif *, dp_purge_callback *, void *aux);
  *
  * Returns 0 if successful, ENOSPC if the flow limit has been reached and no
  * flow should be installed, or some otherwise a positive errno value. */
-typedef int upcall_callback(const struct dp_packet *packet,
+typedef int upcall_callback(struct dp_packet *packet,
                             const struct flow *flow,
                             ovs_u128 *ufid,
                             unsigned pmd_id,
