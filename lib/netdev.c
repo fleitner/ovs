@@ -804,19 +804,19 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
     l4_mask = dp_packet_hwol_l4_mask(packet);
     if (l4_mask) {
         if (dp_packet_hwol_l4_is_tcp(packet)) {
-            if (!(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CKSUM)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_TCP_CSUM)) {
                 /* Fall back to TCP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No TCP checksum support");
                 return false;
             }
         } else if (dp_packet_hwol_l4_is_udp(packet)) {
-            if (!(netdev_flags & NETDEV_TX_OFFLOAD_UDP_CKSUM)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_UDP_CSUM)) {
                 /* Fall back to UDP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No UDP checksum support");
                 return false;
             }
         } else if (dp_packet_hwol_l4_is_sctp(packet)) {
-            if (!(netdev_flags & NETDEV_TX_OFFLOAD_SCTP_CKSUM)) {
+            if (!(netdev_flags & NETDEV_TX_OFFLOAD_SCTP_CSUM)) {
                 /* Fall back to SCTP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No SCTP checksum support");
                 return false;

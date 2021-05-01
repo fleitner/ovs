@@ -925,10 +925,10 @@ netdev_linux_common_construct(struct netdev *netdev_)
 
     if (userspace_tso_enabled()) {
         netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CKSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_UDP_CKSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CKSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CKSUM;
+        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CSUM;
+        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_UDP_CSUM;
+        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CSUM;
+        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CSUM;
     }
 
     return 0;

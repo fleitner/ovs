@@ -38,10 +38,10 @@ struct netdev_tnl_build_header_params;
 #define NETDEV_NUMA_UNSPEC OVS_NUMA_UNSPEC
 
 enum netdev_ol_flags {
-    NETDEV_TX_OFFLOAD_IPV4_CKSUM = 1 << 0,
-    NETDEV_TX_OFFLOAD_TCP_CKSUM = 1 << 1,
-    NETDEV_TX_OFFLOAD_UDP_CKSUM = 1 << 2,
-    NETDEV_TX_OFFLOAD_SCTP_CKSUM = 1 << 3,
+    NETDEV_TX_OFFLOAD_IPV4_CSUM = 1 << 0,
+    NETDEV_TX_OFFLOAD_TCP_CSUM = 1 << 1,
+    NETDEV_TX_OFFLOAD_UDP_CSUM = 1 << 2,
+    NETDEV_TX_OFFLOAD_SCTP_CSUM = 1 << 3,
     NETDEV_TX_OFFLOAD_TCP_TSO = 1 << 4,
 };
 
