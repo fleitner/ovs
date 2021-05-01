@@ -5007,12 +5007,12 @@ netdev_dpdk_reconfigure(struct netdev *netdev)
 
     err = dpdk_eth_dev_init(dev);
     if (dev->hw_ol_features & NETDEV_TX_TSO_OFFLOAD) {
-        netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
-        netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CSUM;
-        netdev->ol_flags |= NETDEV_TX_OFFLOAD_UDP_CSUM;
-        netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CSUM;
+        netdev->ol_flags |= NETDEV_OFFLOAD_TX_TCP_TSO;
+        netdev->ol_flags |= NETDEV_OFFLOAD_TX_TCP_CSUM;
+        netdev->ol_flags |= NETDEV_OFFLOAD_TX_UDP_CSUM;
+        netdev->ol_flags |= NETDEV_OFFLOAD_TX_IPV4_CSUM;
         if (dev->hw_ol_features & NETDEV_TX_SCTP_CHECKSUM_OFFLOAD) {
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CSUM;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_SCTP_CSUM;
         }
     }
 
@@ -5154,11 +5154,11 @@ netdev_dpdk_vhost_client_reconfigure(struct netdev *netdev)
         }
 
         if (userspace_tso_enabled()) {
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CSUM;
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_UDP_CSUM;
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CSUM;
-            netdev->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CSUM;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_TCP_TSO;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_TCP_CSUM;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_UDP_CSUM;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_SCTP_CSUM;
+            netdev->ol_flags |= NETDEV_OFFLOAD_TX_IPV4_CSUM;
             vhost_unsup_flags = 1ULL << VIRTIO_NET_F_HOST_ECN
                                 | 1ULL << VIRTIO_NET_F_HOST_UFO;
         } else {

@@ -924,11 +924,11 @@ netdev_linux_common_construct(struct netdev *netdev_)
     ovs_mutex_init(&netdev->mutex);
 
     if (userspace_tso_enabled()) {
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_TSO;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_TCP_CSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_UDP_CSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_SCTP_CSUM;
-        netdev_->ol_flags |= NETDEV_TX_OFFLOAD_IPV4_CSUM;
+        netdev_->ol_flags |= NETDEV_OFFLOAD_TX_TCP_TSO;
+        netdev_->ol_flags |= NETDEV_OFFLOAD_TX_TCP_CSUM;
+        netdev_->ol_flags |= NETDEV_OFFLOAD_TX_UDP_CSUM;
+        netdev_->ol_flags |= NETDEV_OFFLOAD_TX_SCTP_CSUM;
+        netdev_->ol_flags |= NETDEV_OFFLOAD_TX_IPV4_CSUM;
     }
 
     return 0;

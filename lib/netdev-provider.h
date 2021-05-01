@@ -38,11 +38,11 @@ struct netdev_tnl_build_header_params;
 #define NETDEV_NUMA_UNSPEC OVS_NUMA_UNSPEC
 
 enum netdev_ol_flags {
-    NETDEV_TX_OFFLOAD_IPV4_CSUM = 1 << 0,
-    NETDEV_TX_OFFLOAD_TCP_CSUM = 1 << 1,
-    NETDEV_TX_OFFLOAD_UDP_CSUM = 1 << 2,
-    NETDEV_TX_OFFLOAD_SCTP_CSUM = 1 << 3,
-    NETDEV_TX_OFFLOAD_TCP_TSO = 1 << 4,
+    NETDEV_OFFLOAD_TX_IPV4_CSUM = 1 << 0,
+    NETDEV_OFFLOAD_TX_TCP_CSUM = 1 << 1,
+    NETDEV_OFFLOAD_TX_UDP_CSUM = 1 << 2,
+    NETDEV_OFFLOAD_TX_SCTP_CSUM = 1 << 3,
+    NETDEV_OFFLOAD_TX_TCP_TSO = 1 << 4,
 };
 
 /* A network device (e.g. an Ethernet device).
