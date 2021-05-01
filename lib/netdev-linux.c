@@ -6536,7 +6536,7 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
         }
 
         *l4proto = ip_hdr->ip_proto;
-        dp_packet_hwol_set_tx_ipv4(b);
+        dp_packet_ol_set_tx_ipv4(b);
     } else if (eth_type == htons(ETH_TYPE_IPV6)) {
         struct ovs_16aligned_ip6_hdr *nh6;
 
@@ -6546,7 +6546,7 @@ netdev_linux_parse_l2(struct dp_packet *b, uint16_t *l4proto)
         }
 
         *l4proto = nh6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-        dp_packet_hwol_set_tx_ipv6(b);
+        dp_packet_ol_set_tx_ipv6(b);
     }
 
     return 0;
@@ -6572,11 +6572,11 @@ netdev_linux_parse_vnet_hdr(struct dp_packet *b)
 
     if (vnet->flags == VIRTIO_NET_HDR_F_NEEDS_CSUM) {
         if (l4proto == IPPROTO_TCP) {
-            dp_packet_hwol_set_csum_tcp(b);
+            dp_packet_ol_set_csum_tcp(b);
         } else if (l4proto == IPPROTO_UDP) {
-            dp_packet_hwol_set_csum_udp(b);
+            dp_packet_ol_set_csum_udp(b);
         } else if (l4proto == IPPROTO_SCTP) {
-            dp_packet_hwol_set_csum_sctp(b);
+            dp_packet_ol_set_csum_sctp(b);
         }
     }
 
@@ -6588,7 +6588,7 @@ netdev_linux_parse_vnet_hdr(struct dp_packet *b)
 
         if (type == VIRTIO_NET_HDR_GSO_TCPV4
             || type == VIRTIO_NET_HDR_GSO_TCPV6) {
-            dp_packet_hwol_set_tcp_seg(b);
+            dp_packet_ol_set_tcp_seg(b);
         }
     }
 
@@ -6600,13 +6600,13 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
 {
     struct virtio_net_hdr *vnet = dp_packet_push_zeros(b, sizeof *vnet);
 
-    if (dp_packet_hwol_is_tso(b)) {
+    if (dp_packet_ol_is_tso(b)) {
         uint16_t hdr_len = ((char *)dp_packet_l4(b) - (char *)dp_packet_eth(b))
                             + TCP_HEADER_LEN;
 
         vnet->hdr_len = (OVS_FORCE __virtio16)hdr_len;
         vnet->gso_size = (OVS_FORCE __virtio16)(mtu - hdr_len);
-        if (dp_packet_hwol_is_ipv4(b)) {
+        if (dp_packet_ol_is_ipv4(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
         } else {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
@@ -6616,18 +6616,18 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
         vnet->flags = VIRTIO_NET_HDR_GSO_NONE;
     }
 
-    if (dp_packet_hwol_l4_mask(b)) {
+    if (dp_packet_ol_l4_mask(b)) {
         vnet->flags = VIRTIO_NET_HDR_F_NEEDS_CSUM;
         vnet->csum_start = (OVS_FORCE __virtio16)((char *)dp_packet_l4(b)
                                                   - (char *)dp_packet_eth(b));
 
-        if (dp_packet_hwol_l4_is_tcp(b)) {
+        if (dp_packet_ol_l4_is_tcp(b)) {
             vnet->csum_offset = (OVS_FORCE __virtio16) __builtin_offsetof(
                                     struct tcp_header, tcp_csum);
-        } else if (dp_packet_hwol_l4_is_udp(b)) {
+        } else if (dp_packet_ol_l4_is_udp(b)) {
             vnet->csum_offset = (OVS_FORCE __virtio16) __builtin_offsetof(
                                     struct udp_header, udp_csum);
-        } else if (dp_packet_hwol_l4_is_sctp(b)) {
+        } else if (dp_packet_ol_l4_is_sctp(b)) {
             vnet->csum_offset = (OVS_FORCE __virtio16) __builtin_offsetof(
                                     struct sctp_header, sctp_csum);
         } else {

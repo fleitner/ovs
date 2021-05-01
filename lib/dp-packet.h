@@ -947,35 +947,35 @@ dp_packet_set_flow_mark(struct dp_packet *p, uint32_t mark)
 
 /* Returns the L4 cksum offload bitmask. */
 static inline uint64_t
-dp_packet_hwol_l4_mask(const struct dp_packet *b)
+dp_packet_ol_l4_mask(const struct dp_packet *b)
 {
     return *dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK;
 }
 
 /* Return true if the packet 'b' requested L4 checksum offload. */
 static inline bool
-dp_packet_hwol_tx_l4_csum(const struct dp_packet *b)
+dp_packet_ol_tx_l4_csum(const struct dp_packet *b)
 {
-    return !!dp_packet_hwol_l4_mask(b);
+    return !!dp_packet_ol_l4_mask(b);
 }
 
 /* Returns 'true' if packet 'b' is marked for TCP segmentation offloading. */
 static inline bool
-dp_packet_hwol_is_tso(const struct dp_packet *b)
+dp_packet_ol_is_tso(const struct dp_packet *b)
 {
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_TCP_SEG);
 }
 
 /* Returns 'true' if packet 'b' is marked for IPv4 checksum offloading. */
 static inline bool
-dp_packet_hwol_is_ipv4(const struct dp_packet *b)
+dp_packet_ol_is_ipv4(const struct dp_packet *b)
 {
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_IPV4);
 }
 
 /* Returns 'true' if packet 'b' is marked for TCP checksum offloading. */
 static inline bool
-dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
+dp_packet_ol_l4_is_tcp(const struct dp_packet *b)
 {
     return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_TCP_CSUM;
@@ -983,7 +983,7 @@ dp_packet_hwol_l4_is_tcp(const struct dp_packet *b)
 
 /* Returns 'true' if packet 'b' is marked for UDP checksum offloading. */
 static inline bool
-dp_packet_hwol_l4_is_udp(struct dp_packet *b)
+dp_packet_ol_l4_is_udp(struct dp_packet *b)
 {
     return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_UDP_CSUM;
@@ -991,7 +991,7 @@ dp_packet_hwol_l4_is_udp(struct dp_packet *b)
 
 /* Returns 'true' if packet 'b' is marked for SCTP checksum offloading. */
 static inline bool
-dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
+dp_packet_ol_l4_is_sctp(struct dp_packet *b)
 {
     return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_SCTP_CSUM;
@@ -999,14 +999,14 @@ dp_packet_hwol_l4_is_sctp(struct dp_packet *b)
 
 /* Mark packet 'b' for IPv4 checksum offloading. */
 static inline void
-dp_packet_hwol_set_tx_ipv4(struct dp_packet *b)
+dp_packet_ol_set_tx_ipv4(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_IPV4;
 }
 
 /* Mark packet 'b' for IPv6 checksum offloading. */
 static inline void
-dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
+dp_packet_ol_set_tx_ipv6(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_IPV6;
 }
@@ -1014,7 +1014,7 @@ dp_packet_hwol_set_tx_ipv6(struct dp_packet *b)
 /* Mark packet 'b' for TCP checksum offloading.  It implies that either
  * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
+dp_packet_ol_set_csum_tcp(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_CSUM;
 }
@@ -1022,7 +1022,7 @@ dp_packet_hwol_set_csum_tcp(struct dp_packet *b)
 /* Mark packet 'b' for UDP checksum offloading.  It implies that either
  * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_hwol_set_csum_udp(struct dp_packet *b)
+dp_packet_ol_set_csum_udp(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_UDP_CSUM;
 }
@@ -1030,7 +1030,7 @@ dp_packet_hwol_set_csum_udp(struct dp_packet *b)
 /* Mark packet 'b' for SCTP checksum offloading.  It implies that either
  * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
+dp_packet_ol_set_csum_sctp(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_SCTP_CSUM;
 }
@@ -1039,7 +1039,7 @@ dp_packet_hwol_set_csum_sctp(struct dp_packet *b)
  * either the packet 'b' is marked for IPv4 or IPv6 checksum offloading
  * and also for TCP checksum offloading. */
 static inline void
-dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
+dp_packet_ol_set_tcp_seg(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_SEG;
 }

@@ -794,28 +794,28 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
 {
     uint64_t l4_mask;
 
-    if (dp_packet_hwol_is_tso(packet)
+    if (dp_packet_ol_is_tso(packet)
         && !(netdev_flags & NETDEV_OFFLOAD_TX_TCP_TSO)) {
             /* Fall back to GSO in software. */
             VLOG_ERR_BUF(errormsg, "No TSO support");
             return false;
     }
 
-    l4_mask = dp_packet_hwol_l4_mask(packet);
+    l4_mask = dp_packet_ol_l4_mask(packet);
     if (l4_mask) {
-        if (dp_packet_hwol_l4_is_tcp(packet)) {
+        if (dp_packet_ol_l4_is_tcp(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_TCP_CSUM)) {
                 /* Fall back to TCP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No TCP checksum support");
                 return false;
             }
-        } else if (dp_packet_hwol_l4_is_udp(packet)) {
+        } else if (dp_packet_ol_l4_is_udp(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_UDP_CSUM)) {
                 /* Fall back to UDP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No UDP checksum support");
                 return false;
             }
-        } else if (dp_packet_hwol_l4_is_sctp(packet)) {
+        } else if (dp_packet_ol_l4_is_sctp(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_SCTP_CSUM)) {
                 /* Fall back to SCTP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No SCTP checksum support");
@@ -960,8 +960,8 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-        if (OVS_UNLIKELY(dp_packet_hwol_is_tso(packet)
-                         || dp_packet_hwol_l4_mask(packet))) {
+        if (OVS_UNLIKELY(dp_packet_ol_is_tso(packet)
+                         || dp_packet_ol_l4_mask(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
             VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
