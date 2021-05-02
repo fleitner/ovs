@@ -792,8 +792,6 @@ static bool
 netdev_send_prepare_packet(const uint64_t netdev_flags,
                            struct dp_packet *packet, char **errormsg)
 {
-    uint64_t l4_mask;
-
     if (dp_packet_ol_tcp_seg(packet)
         && !(netdev_flags & NETDEV_OFFLOAD_TX_TCP_TSO)) {
             /* Fall back to GSO in software. */
@@ -801,29 +799,29 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
             return false;
     }
 
-    l4_mask = dp_packet_ol_l4_mask(packet);
-    if (l4_mask) {
-        if (dp_packet_ol_l4_is_tcp(packet)) {
+    if (dp_packet_ol_tx_l4_csum(packet)) {
+        if (dp_packet_ol_tx_tcp_csum(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_TCP_CSUM)) {
                 /* Fall back to TCP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No TCP checksum support");
                 return false;
             }
-        } else if (dp_packet_ol_l4_is_udp(packet)) {
+        } else if (dp_packet_ol_tx_udp_csum(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_UDP_CSUM)) {
                 /* Fall back to UDP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No UDP checksum support");
                 return false;
             }
-        } else if (dp_packet_ol_l4_is_sctp(packet)) {
+        } else if (dp_packet_ol_tx_sctp_csum(packet)) {
             if (!(netdev_flags & NETDEV_OFFLOAD_TX_SCTP_CSUM)) {
                 /* Fall back to SCTP csum in software. */
                 VLOG_ERR_BUF(errormsg, "No SCTP checksum support");
                 return false;
             }
         } else {
-            VLOG_ERR_BUF(errormsg, "No L4 checksum support: mask: %"PRIu64,
-                         l4_mask);
+            uint64_t ol_flags = *dp_packet_ol_flags_ptr(packet);
+            VLOG_ERR_BUF(errormsg, "No L4 checksum support: "
+                         "offload mask: %"PRIu64, ol_flags);
             return false;
         }
     }
@@ -961,7 +959,7 @@ netdev_push_header(const struct netdev *netdev,
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
         if (OVS_UNLIKELY(dp_packet_ol_tcp_seg(packet)
-                         || dp_packet_ol_l4_mask(packet))) {
+                         || dp_packet_ol_tx_l4_csum(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
             VLOG_WARN_RL(&rl, "%s: Tunneling packets with HW offload flags is "
