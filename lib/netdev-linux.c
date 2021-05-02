@@ -6606,7 +6606,7 @@ netdev_linux_prepend_vnet_hdr(struct dp_packet *b, int mtu)
 
         vnet->hdr_len = (OVS_FORCE __virtio16)hdr_len;
         vnet->gso_size = (OVS_FORCE __virtio16)(mtu - hdr_len);
-        if (dp_packet_ol_is_ipv4(b)) {
+        if (dp_packet_ol_tx_ipv4(b)) {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
         } else {
             vnet->gso_type = VIRTIO_NET_HDR_GSO_TCPV6;

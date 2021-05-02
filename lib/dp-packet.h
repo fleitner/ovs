@@ -968,7 +968,7 @@ dp_packet_ol_tcp_seg(const struct dp_packet *p)
 
 /* Returns 'true' if packet 'p' is marked for IPv4 checksum offloading. */
 static inline bool
-dp_packet_ol_is_ipv4(const struct dp_packet *p)
+dp_packet_ol_tx_ipv4(const struct dp_packet *p)
 {
     return !!(*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_IPV4);
 }
