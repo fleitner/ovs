@@ -574,7 +574,7 @@ ipf_list_state_transition(struct ipf *ipf, struct ipf_list *ipf_list,
 static bool
 ipf_is_valid_v4_frag(struct ipf *ipf, struct dp_packet *pkt)
 {
-    if (OVS_UNLIKELY(dp_packet_ip_csum_bad(pkt))) {
+    if (OVS_UNLIKELY(dp_packet_ol_ip_csum_bad(pkt))) {
         goto invalid_pkt;
     }
 
@@ -607,7 +607,7 @@ ipf_is_valid_v4_frag(struct ipf *ipf, struct dp_packet *pkt)
         goto invalid_pkt;
     }
 
-    if (OVS_UNLIKELY(!dp_packet_ip_csum_good(pkt)
+    if (OVS_UNLIKELY(!dp_packet_ol_ip_csum_good(pkt)
                      && !dp_packet_ol_tx_ipv4(pkt)
                      && csum(l3, ip_hdr_len) != 0)) {
         goto invalid_pkt;

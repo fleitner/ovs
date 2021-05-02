@@ -922,7 +922,7 @@ dp_packet_rss_valid(const struct dp_packet *p)
 }
 
 static inline void
-dp_packet_reset_offload(struct dp_packet *p)
+dp_packet_ol_reset(struct dp_packet *p)
 {
     *dp_packet_ol_flags_ptr(p) &= ~DP_PACKET_OL_SUPPORTED_MASK;
 }
@@ -1038,28 +1038,28 @@ dp_packet_ol_set_tcp_seg(struct dp_packet *p)
 }
 
 static inline bool
-dp_packet_ip_csum_good(const struct dp_packet *p)
+dp_packet_ol_ip_csum_good(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_IP_CSUM_MASK) ==
             DP_PACKET_OL_RX_IP_CSUM_GOOD;
 }
 
 static inline bool
-dp_packet_ip_csum_bad(const struct dp_packet *p)
+dp_packet_ol_ip_csum_bad(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_IP_CSUM_MASK) ==
             DP_PACKET_OL_RX_IP_CSUM_BAD;
 }
 
 static inline bool
-dp_packet_l4_csum_good(const struct dp_packet *p)
+dp_packet_ol_l4_csum_good(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CSUM_GOOD;
 }
 
 static inline bool
-dp_packet_l4_csum_bad(const struct dp_packet *p)
+dp_packet_ol_l4_csum_bad(const struct dp_packet *p)
 {
     return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_RX_L4_CSUM_MASK) ==
             DP_PACKET_OL_RX_L4_CSUM_BAD;

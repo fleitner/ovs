@@ -439,7 +439,7 @@ pop_mpls(struct dp_packet *packet, ovs_be16 ethtype)
 
         /* Invalidate offload flags as they are not valid after
          * decapsulation of MPLS header. */
-        dp_packet_reset_offload(packet);
+        dp_packet_ol_reset(packet);
     }
 }
 
