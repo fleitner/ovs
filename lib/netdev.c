@@ -794,7 +794,7 @@ netdev_send_prepare_packet(const uint64_t netdev_flags,
 {
     uint64_t l4_mask;
 
-    if (dp_packet_ol_is_tso(packet)
+    if (dp_packet_ol_tcp_seg(packet)
         && !(netdev_flags & NETDEV_OFFLOAD_TX_TCP_TSO)) {
             /* Fall back to GSO in software. */
             VLOG_ERR_BUF(errormsg, "No TSO support");
@@ -960,7 +960,7 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-        if (OVS_UNLIKELY(dp_packet_ol_is_tso(packet)
+        if (OVS_UNLIKELY(dp_packet_ol_tcp_seg(packet)
                          || dp_packet_ol_l4_mask(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
