@@ -196,7 +196,7 @@ struct dp_packet *dp_packet_clone_with_headroom(const struct dp_packet *,
 struct dp_packet *dp_packet_clone_data(const void *, size_t);
 struct dp_packet *dp_packet_clone_data_with_headroom(const void *, size_t,
                                                      size_t headroom);
-void dp_packet_resize(struct dp_packet *b, size_t new_headroom,
+void dp_packet_resize(struct dp_packet *p, size_t new_headroom,
                       size_t new_tailroom);
 static inline void dp_packet_delete(struct dp_packet *);
 
@@ -234,229 +234,229 @@ static inline bool dp_packet_equal(const struct dp_packet *,
                                    const struct dp_packet *);
 
 
-/* Frees memory that 'b' points to, as well as 'b' itself. */
+/* Frees memory that 'p' points to, as well as 'p' itself. */
 static inline void
-dp_packet_delete(struct dp_packet *b)
+dp_packet_delete(struct dp_packet *p)
 {
-    if (b) {
-        if (b->source == DPBUF_DPDK) {
+    if (p) {
+        if (p->source == DPBUF_DPDK) {
             /* If this dp_packet was allocated by DPDK it must have been
              * created as a dp_packet */
-            free_dpdk_buf((struct dp_packet*) b);
+            free_dpdk_buf((struct dp_packet*) p);
             return;
         }
 
-        if (b->source == DPBUF_AFXDP) {
-            free_afxdp_buf(b);
+        if (p->source == DPBUF_AFXDP) {
+            free_afxdp_buf(p);
             return;
         }
 
-        dp_packet_uninit(b);
-        free(b);
+        dp_packet_uninit(p);
+        free(p);
     }
 }
 
-/* If 'b' contains at least 'offset + size' bytes of data, returns a pointer to
+/* If 'p' contains at least 'offset + size' bytes of data, returns a pointer to
  * byte 'offset'.  Otherwise, returns a null pointer. */
 static inline void *
-dp_packet_at(const struct dp_packet *b, size_t offset, size_t size)
+dp_packet_at(const struct dp_packet *p, size_t offset, size_t size)
 {
-    return offset + size <= dp_packet_size(b)
-           ? (char *) dp_packet_data(b) + offset
+    return offset + size <= dp_packet_size(p)
+           ? (char *) dp_packet_data(p) + offset
            : NULL;
 }
 
-/* Returns a pointer to byte 'offset' in 'b', which must contain at least
+/* Returns a pointer to byte 'offset' in 'p', which must contain at least
  * 'offset + size' bytes of data. */
 static inline void *
-dp_packet_at_assert(const struct dp_packet *b, size_t offset, size_t size)
+dp_packet_at_assert(const struct dp_packet *p, size_t offset, size_t size)
 {
-    ovs_assert(offset + size <= dp_packet_size(b));
-    return ((char *) dp_packet_data(b)) + offset;
+    ovs_assert(offset + size <= dp_packet_size(p));
+    return ((char *) dp_packet_data(p)) + offset;
 }
 
-/* Returns a pointer to byte following the last byte of data in use in 'b'. */
+/* Returns a pointer to byte following the last byte of data in use in 'p'. */
 static inline void *
-dp_packet_tail(const struct dp_packet *b)
+dp_packet_tail(const struct dp_packet *p)
 {
-    return (char *) dp_packet_data(b) + dp_packet_size(b);
+    return (char *) dp_packet_data(p) + dp_packet_size(p);
 }
 
 /* Returns a pointer to byte following the last byte allocated for use (but
- * not necessarily in use) in 'b'. */
+ * not necessarily in use) in 'p'. */
 static inline void *
-dp_packet_end(const struct dp_packet *b)
+dp_packet_end(const struct dp_packet *p)
 {
-    return (char *) dp_packet_base(b) + dp_packet_get_allocated(b);
+    return (char *) dp_packet_base(p) + dp_packet_get_allocated(p);
 }
 
-/* Returns the number of bytes of headroom in 'b', that is, the number of bytes
- * of unused space in dp_packet 'b' before the data that is in use.  (Most
+/* Returns the number of bytes of headroom in 'p', that is, the number of bytes
+ * of unused space in dp_packet 'p' before the data that is in use.  (Most
  * commonly, the data in a dp_packet is at its beginning, and thus the
  * dp_packet's headroom is 0.) */
 static inline size_t
-dp_packet_headroom(const struct dp_packet *b)
+dp_packet_headroom(const struct dp_packet *p)
 {
-    return (char *) dp_packet_data(b) - (char *) dp_packet_base(b);
+    return (char *) dp_packet_data(p) - (char *) dp_packet_base(p);
 }
 
 /* Returns the number of bytes that may be appended to the tail end of
- * dp_packet 'b' before the dp_packet must be reallocated. */
+ * dp_packet 'p' before the dp_packet must be reallocated. */
 static inline size_t
-dp_packet_tailroom(const struct dp_packet *b)
+dp_packet_tailroom(const struct dp_packet *p)
 {
-    return (char *) dp_packet_end(b) - (char *) dp_packet_tail(b);
+    return (char *) dp_packet_end(p) - (char *) dp_packet_tail(p);
 }
 
-/* Clears any data from 'b'. */
+/* Clears any data from 'p'. */
 static inline void
-dp_packet_clear(struct dp_packet *b)
+dp_packet_clear(struct dp_packet *p)
 {
-    dp_packet_set_data(b, dp_packet_base(b));
-    dp_packet_set_size(b, 0);
+    dp_packet_set_data(p, dp_packet_base(p));
+    dp_packet_set_size(p, 0);
 }
 
-/* Removes 'size' bytes from the head end of 'b', which must contain at least
+/* Removes 'size' bytes from the head end of 'p', which must contain at least
  * 'size' bytes of data.  Returns the first byte of data removed. */
 static inline void *
-dp_packet_pull(struct dp_packet *b, size_t size)
+dp_packet_pull(struct dp_packet *p, size_t size)
 {
-    void *data = dp_packet_data(b);
-    ovs_assert(dp_packet_size(b) - dp_packet_l2_pad_size(b) >= size);
-    dp_packet_set_data(b, (char *) dp_packet_data(b) + size);
-    dp_packet_set_size(b, dp_packet_size(b) - size);
+    void *data = dp_packet_data(p);
+    ovs_assert(dp_packet_size(p) - dp_packet_l2_pad_size(p) >= size);
+    dp_packet_set_data(p, (char *) dp_packet_data(p) + size);
+    dp_packet_set_size(p, dp_packet_size(p) - size);
     return data;
 }
 
-/* If 'b' has at least 'size' bytes of data, removes that many bytes from the
- * head end of 'b' and returns the first byte removed.  Otherwise, returns a
- * null pointer without modifying 'b'. */
+/* If 'p' has at least 'size' bytes of data, removes that many bytes from the
+ * head end of 'p' and returns the first byte removed.  Otherwise, returns a
+ * null pointer without modifying 'p'. */
 static inline void *
-dp_packet_try_pull(struct dp_packet *b, size_t size)
+dp_packet_try_pull(struct dp_packet *p, size_t size)
 {
-    return dp_packet_size(b) - dp_packet_l2_pad_size(b) >= size
-        ? dp_packet_pull(b, size) : NULL;
+    return dp_packet_size(p) - dp_packet_l2_pad_size(p) >= size
+        ? dp_packet_pull(p, size) : NULL;
 }
 
 static inline bool
-dp_packet_equal(const struct dp_packet *a, const struct dp_packet *b)
+dp_packet_equal(const struct dp_packet *p1, const struct dp_packet *p2)
 {
-    return dp_packet_size(a) == dp_packet_size(b) &&
-           !memcmp(dp_packet_data(a), dp_packet_data(b), dp_packet_size(a));
+    return dp_packet_size(p1) == dp_packet_size(p2) &&
+           !memcmp(dp_packet_data(p1), dp_packet_data(p2), dp_packet_size(p1));
 }
 
 static inline bool
-dp_packet_is_eth(const struct dp_packet *b)
+dp_packet_is_eth(const struct dp_packet *p)
 {
-    return b->packet_type == htonl(PT_ETH);
+    return p->packet_type == htonl(PT_ETH);
 }
 
 /* Get the start of the Ethernet frame. 'l3_ofs' marks the end of the l2
  * headers, so return NULL if it is not set. */
 static inline void *
-dp_packet_eth(const struct dp_packet *b)
+dp_packet_eth(const struct dp_packet *p)
 {
-    return (dp_packet_is_eth(b) && b->l3_ofs != UINT16_MAX)
-            ? dp_packet_data(b) : NULL;
+    return (dp_packet_is_eth(p) && p->l3_ofs != UINT16_MAX)
+            ? dp_packet_data(p) : NULL;
 }
 
 /* Resets all layer offsets.  'l3' offset must be set before 'l2' can be
  * retrieved. */
 static inline void
-dp_packet_reset_offsets(struct dp_packet *b)
+dp_packet_reset_offsets(struct dp_packet *p)
 {
-    b->l2_pad_size = 0;
-    b->l2_5_ofs = UINT16_MAX;
-    b->l3_ofs = UINT16_MAX;
-    b->l4_ofs = UINT16_MAX;
+    p->l2_pad_size = 0;
+    p->l2_5_ofs = UINT16_MAX;
+    p->l3_ofs = UINT16_MAX;
+    p->l4_ofs = UINT16_MAX;
 }
 
 static inline uint16_t
-dp_packet_l2_pad_size(const struct dp_packet *b)
+dp_packet_l2_pad_size(const struct dp_packet *p)
 {
-    return b->l2_pad_size;
+    return p->l2_pad_size;
 }
 
 static inline void
-dp_packet_set_l2_pad_size(struct dp_packet *b, uint16_t pad_size)
+dp_packet_set_l2_pad_size(struct dp_packet *p, uint16_t pad_size)
 {
-    ovs_assert(pad_size <= dp_packet_size(b));
-    b->l2_pad_size = pad_size;
+    ovs_assert(pad_size <= dp_packet_size(p));
+    p->l2_pad_size = pad_size;
 }
 
 static inline void *
-dp_packet_l2_5(const struct dp_packet *b)
+dp_packet_l2_5(const struct dp_packet *p)
 {
-    return b->l2_5_ofs != UINT16_MAX
-           ? (char *) dp_packet_data(b) + b->l2_5_ofs
+    return p->l2_5_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(p) + p->l2_5_ofs
            : NULL;
 }
 
 static inline void
-dp_packet_set_l2_5(struct dp_packet *b, void *l2_5)
+dp_packet_set_l2_5(struct dp_packet *p, void *l2_5)
 {
-    b->l2_5_ofs = l2_5
-                  ? (char *) l2_5 - (char *) dp_packet_data(b)
+    p->l2_5_ofs = l2_5
+                  ? (char *) l2_5 - (char *) dp_packet_data(p)
                   : UINT16_MAX;
 }
 
 static inline void *
-dp_packet_l3(const struct dp_packet *b)
+dp_packet_l3(const struct dp_packet *p)
 {
-    return b->l3_ofs != UINT16_MAX
-           ? (char *) dp_packet_data(b) + b->l3_ofs
+    return p->l3_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(p) + p->l3_ofs
            : NULL;
 }
 
 static inline void
-dp_packet_set_l3(struct dp_packet *b, void *l3)
+dp_packet_set_l3(struct dp_packet *p, void *l3)
 {
-    b->l3_ofs = l3 ? (char *) l3 - (char *) dp_packet_data(b) : UINT16_MAX;
+    p->l3_ofs = l3 ? (char *) l3 - (char *) dp_packet_data(p) : UINT16_MAX;
 }
 
 static inline void *
-dp_packet_l4(const struct dp_packet *b)
+dp_packet_l4(const struct dp_packet *p)
 {
-    return b->l4_ofs != UINT16_MAX
-           ? (char *) dp_packet_data(b) + b->l4_ofs
+    return p->l4_ofs != UINT16_MAX
+           ? (char *) dp_packet_data(p) + p->l4_ofs
            : NULL;
 }
 
 static inline void
-dp_packet_set_l4(struct dp_packet *b, void *l4)
+dp_packet_set_l4(struct dp_packet *p, void *l4)
 {
-    b->l4_ofs = l4 ? (char *) l4 - (char *) dp_packet_data(b) : UINT16_MAX;
+    p->l4_ofs = l4 ? (char *) l4 - (char *) dp_packet_data(p) : UINT16_MAX;
 }
 
 /* Returns the size of the packet from the beginning of the L3 header to the
  * end of the L3 payload.  Hence L2 padding is not included. */
 static inline size_t
-dp_packet_l3_size(const struct dp_packet *b)
+dp_packet_l3_size(const struct dp_packet *p)
 {
-    return OVS_LIKELY(b->l3_ofs != UINT16_MAX)
-        ? (const char *)dp_packet_tail(b) - (const char *)dp_packet_l3(b)
-        - dp_packet_l2_pad_size(b)
+    return OVS_LIKELY(p->l3_ofs != UINT16_MAX)
+        ? (const char *)dp_packet_tail(p) - (const char *)dp_packet_l3(p)
+        - dp_packet_l2_pad_size(p)
         : 0;
 }
 
 /* Returns the size of the packet from the beginning of the L4 header to the
  * end of the L4 payload.  Hence L2 padding is not included. */
 static inline size_t
-dp_packet_l4_size(const struct dp_packet *b)
+dp_packet_l4_size(const struct dp_packet *p)
 {
-    return OVS_LIKELY(b->l4_ofs != UINT16_MAX)
-        ? (const char *)dp_packet_tail(b) - (const char *)dp_packet_l4(b)
-        - dp_packet_l2_pad_size(b)
+    return OVS_LIKELY(p->l4_ofs != UINT16_MAX)
+        ? (const char *)dp_packet_tail(p) - (const char *)dp_packet_l4(p)
+        - dp_packet_l2_pad_size(p)
         : 0;
 }
 
 static inline const void *
-dp_packet_get_tcp_payload(const struct dp_packet *b)
+dp_packet_get_tcp_payload(const struct dp_packet *p)
 {
-    size_t l4_size = dp_packet_l4_size(b);
+    size_t l4_size = dp_packet_l4_size(p);
 
     if (OVS_LIKELY(l4_size >= TCP_HEADER_LEN)) {
-        struct tcp_header *tcp = dp_packet_l4(b);
+        struct tcp_header *tcp = dp_packet_l4(p);
         int tcp_len = TCP_OFFSET(tcp->tcp_ctl) * 4;
 
         if (OVS_LIKELY(tcp_len >= TCP_HEADER_LEN && tcp_len <= l4_size)) {
@@ -467,11 +467,11 @@ dp_packet_get_tcp_payload(const struct dp_packet *b)
 }
 
 static inline uint32_t
-dp_packet_get_tcp_payload_length(const struct dp_packet *pkt)
+dp_packet_get_tcp_payload_length(const struct dp_packet *p)
 {
-    const char *tcp_payload = dp_packet_get_tcp_payload(pkt);
+    const char *tcp_payload = dp_packet_get_tcp_payload(p);
     if (tcp_payload) {
-        return ((char *) dp_packet_tail(pkt) - dp_packet_l2_pad_size(pkt)
+        return ((char *) dp_packet_tail(p) - dp_packet_l2_pad_size(p)
                 - tcp_payload);
     } else {
         return 0;
@@ -479,69 +479,69 @@ dp_packet_get_tcp_payload_length(const struct dp_packet *pkt)
 }
 
 static inline const void *
-dp_packet_get_udp_payload(const struct dp_packet *b)
+dp_packet_get_udp_payload(const struct dp_packet *p)
 {
-    return OVS_LIKELY(dp_packet_l4_size(b) >= UDP_HEADER_LEN)
-        ? (const char *)dp_packet_l4(b) + UDP_HEADER_LEN : NULL;
+    return OVS_LIKELY(dp_packet_l4_size(p) >= UDP_HEADER_LEN)
+        ? (const char *)dp_packet_l4(p) + UDP_HEADER_LEN : NULL;
 }
 
 static inline const void *
-dp_packet_get_sctp_payload(const struct dp_packet *b)
+dp_packet_get_sctp_payload(const struct dp_packet *p)
 {
-    return OVS_LIKELY(dp_packet_l4_size(b) >= SCTP_HEADER_LEN)
-        ? (const char *)dp_packet_l4(b) + SCTP_HEADER_LEN : NULL;
+    return OVS_LIKELY(dp_packet_l4_size(p) >= SCTP_HEADER_LEN)
+        ? (const char *)dp_packet_l4(p) + SCTP_HEADER_LEN : NULL;
 }
 
 static inline const void *
-dp_packet_get_icmp_payload(const struct dp_packet *b)
+dp_packet_get_icmp_payload(const struct dp_packet *p)
 {
-    return OVS_LIKELY(dp_packet_l4_size(b) >= ICMP_HEADER_LEN)
-        ? (const char *)dp_packet_l4(b) + ICMP_HEADER_LEN : NULL;
+    return OVS_LIKELY(dp_packet_l4_size(p) >= ICMP_HEADER_LEN)
+        ? (const char *)dp_packet_l4(p) + ICMP_HEADER_LEN : NULL;
 }
 
 static inline const void *
-dp_packet_get_nd_payload(const struct dp_packet *b)
+dp_packet_get_nd_payload(const struct dp_packet *p)
 {
-    return OVS_LIKELY(dp_packet_l4_size(b) >= ND_MSG_LEN)
-        ? (const char *)dp_packet_l4(b) + ND_MSG_LEN : NULL;
+    return OVS_LIKELY(dp_packet_l4_size(p) >= ND_MSG_LEN)
+        ? (const char *)dp_packet_l4(p) + ND_MSG_LEN : NULL;
 }
 
 #ifdef DPDK_NETDEV
 static inline uint64_t *
-dp_packet_ol_flags_ptr(const struct dp_packet *b)
+dp_packet_ol_flags_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint64_t *, &b->mbuf.ol_flags);
+    return CONST_CAST(uint64_t *, &p->mbuf.ol_flags);
 }
 
 static inline uint32_t *
-dp_packet_rss_ptr(const struct dp_packet *b)
+dp_packet_rss_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint32_t *, &b->mbuf.hash.rss);
+    return CONST_CAST(uint32_t *, &p->mbuf.hash.rss);
 }
 
 static inline uint32_t *
-dp_packet_flow_mark_ptr(const struct dp_packet *b)
+dp_packet_flow_mark_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint32_t *, &b->mbuf.hash.fdir.hi);
+    return CONST_CAST(uint32_t *, &p->mbuf.hash.fdir.hi);
 }
 
 #else
 static inline uint32_t *
-dp_packet_ol_flags_ptr(const struct dp_packet *b)
+dp_packet_ol_flags_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint32_t *, &b->ol_flags);
+    return CONST_CAST(uint32_t *, &p->ol_flags);
 }
 
 static inline uint32_t *
-dp_packet_rss_ptr(const struct dp_packet *b)
+dp_packet_rss_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint32_t *, &b->rss_hash);
+    return CONST_CAST(uint32_t *, &p->rss_hash);
 }
 
 static inline uint32_t *
-dp_packet_flow_mark_ptr(const struct dp_packet *b)
+dp_packet_flow_mark_ptr(const struct dp_packet *p)
 {
-    return CONST_CAST(uint32_t *, &b->flow_mark);
+    return CONST_CAST(uint32_t *, &p->flow_mark);
 }
 #endif
 
@@ -559,25 +559,25 @@ dp_packet_init_specific(struct dp_packet *p)
 }
 
 static inline void *
-dp_packet_base(const struct dp_packet *b)
+dp_packet_base(const struct dp_packet *p)
 {
-    return b->mbuf.buf_addr;
+    return p->mbuf.buf_addr;
 }
 
 static inline void
-dp_packet_set_base(struct dp_packet *b, void *d)
+dp_packet_set_base(struct dp_packet *p, void *d)
 {
-    b->mbuf.buf_addr = d;
+    p->mbuf.buf_addr = d;
 }
 
 static inline uint32_t
-dp_packet_size(const struct dp_packet *b)
+dp_packet_size(const struct dp_packet *p)
 {
-    return b->mbuf.pkt_len;
+    return p->mbuf.pkt_len;
 }
 
 static inline void
-dp_packet_set_size(struct dp_packet *b, uint32_t v)
+dp_packet_set_size(struct dp_packet *p, uint32_t v)
 {
     /* netdev-dpdk does not currently support segmentation; consequently, for
      * all intents and purposes, 'data_len' (16 bit) and 'pkt_len' (32 bit) may
@@ -587,33 +587,33 @@ dp_packet_set_size(struct dp_packet *b, uint32_t v)
      * (and thus 'v') will always be <= UINT16_MAX; this means that there is no
      * loss of accuracy in assigning 'v' to 'data_len'.
      */
-    b->mbuf.data_len = (uint16_t)v;  /* Current seg length. */
-    b->mbuf.pkt_len = v;             /* Total length of all segments linked to
+    p->mbuf.data_len = (uint16_t)v;  /* Current seg length. */
+    p->mbuf.pkt_len = v;             /* Total length of all segments linked to
                                       * this segment. */
 }
 
 static inline uint16_t
-__packet_data(const struct dp_packet *b)
+__packet_data(const struct dp_packet *p)
 {
-    return b->mbuf.data_off;
+    return p->mbuf.data_off;
 }
 
 static inline void
-__packet_set_data(struct dp_packet *b, uint16_t v)
+__packet_set_data(struct dp_packet *p, uint16_t v)
 {
-    b->mbuf.data_off = v;
+    p->mbuf.data_off = v;
 }
 
 static inline uint16_t
-dp_packet_get_allocated(const struct dp_packet *b)
+dp_packet_get_allocated(const struct dp_packet *p)
 {
-    return b->mbuf.buf_len;
+    return p->mbuf.buf_len;
 }
 
 static inline void
-dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
+dp_packet_set_allocated(struct dp_packet *p, uint16_t s)
 {
-    b->mbuf.buf_len = s;
+    p->mbuf.buf_len = s;
 }
 
 #else /* DPDK_NETDEV */
@@ -625,112 +625,112 @@ dp_packet_init_specific(struct dp_packet *p OVS_UNUSED)
 }
 
 static inline void *
-dp_packet_base(const struct dp_packet *b)
+dp_packet_base(const struct dp_packet *p)
 {
-    return b->base_;
+    return p->base_;
 }
 
 static inline void
-dp_packet_set_base(struct dp_packet *b, void *d)
+dp_packet_set_base(struct dp_packet *p, void *d)
 {
-    b->base_ = d;
+    p->base_ = d;
 }
 
 static inline uint32_t
-dp_packet_size(const struct dp_packet *b)
+dp_packet_size(const struct dp_packet *p)
 {
-    return b->size_;
+    return p->size_;
 }
 
 static inline void
-dp_packet_set_size(struct dp_packet *b, uint32_t v)
+dp_packet_set_size(struct dp_packet *p, uint32_t v)
 {
-    b->size_ = v;
+    p->size_ = v;
 }
 
 static inline uint16_t
-__packet_data(const struct dp_packet *b)
+__packet_data(const struct dp_packet *p)
 {
-    return b->data_ofs;
+    return p->data_ofs;
 }
 
 static inline void
-__packet_set_data(struct dp_packet *b, uint16_t v)
+__packet_set_data(struct dp_packet *p, uint16_t v)
 {
-    b->data_ofs = v;
+    p->data_ofs = v;
 }
 
 static inline uint16_t
-dp_packet_get_allocated(const struct dp_packet *b)
+dp_packet_get_allocated(const struct dp_packet *p)
 {
-    return b->allocated_;
+    return p->allocated_;
 }
 
 static inline void
-dp_packet_set_allocated(struct dp_packet *b, uint16_t s)
+dp_packet_set_allocated(struct dp_packet *p, uint16_t s)
 {
-    b->allocated_ = s;
+    p->allocated_ = s;
 }
 
 #endif /* DPDK_NETDEV */
 
 static inline void
-dp_packet_reset_cutlen(struct dp_packet *b)
+dp_packet_reset_cutlen(struct dp_packet *p)
 {
-    b->cutlen = 0;
+    p->cutlen = 0;
 }
 
 static inline uint32_t
-dp_packet_set_cutlen(struct dp_packet *b, uint32_t max_len)
+dp_packet_set_cutlen(struct dp_packet *p, uint32_t max_len)
 {
     if (max_len < ETH_HEADER_LEN) {
         max_len = ETH_HEADER_LEN;
     }
 
-    if (max_len >= dp_packet_size(b)) {
-        b->cutlen = 0;
+    if (max_len >= dp_packet_size(p)) {
+        p->cutlen = 0;
     } else {
-        b->cutlen = dp_packet_size(b) - max_len;
+        p->cutlen = dp_packet_size(p) - max_len;
     }
-    return b->cutlen;
+    return p->cutlen;
 }
 
 static inline uint32_t
-dp_packet_get_cutlen(const struct dp_packet *b)
+dp_packet_get_cutlen(const struct dp_packet *p)
 {
     /* Always in valid range if user uses dp_packet_set_cutlen. */
-    return b->cutlen;
+    return p->cutlen;
 }
 
 static inline uint32_t
-dp_packet_get_send_len(const struct dp_packet *b)
+dp_packet_get_send_len(const struct dp_packet *p)
 {
-    return dp_packet_size(b) - dp_packet_get_cutlen(b);
+    return dp_packet_size(p) - dp_packet_get_cutlen(p);
 }
 
 static inline void *
-dp_packet_data(const struct dp_packet *b)
+dp_packet_data(const struct dp_packet *p)
 {
-    return __packet_data(b) != UINT16_MAX
-           ? (char *) dp_packet_base(b) + __packet_data(b) : NULL;
+    return __packet_data(p) != UINT16_MAX
+           ? (char *) dp_packet_base(p) + __packet_data(p) : NULL;
 }
 
 static inline void
-dp_packet_set_data(struct dp_packet *b, void *data)
+dp_packet_set_data(struct dp_packet *p, void *data)
 {
     if (data) {
-        __packet_set_data(b, (char *) data - (char *) dp_packet_base(b));
+        __packet_set_data(p, (char *) data - (char *) dp_packet_base(p));
     } else {
-        __packet_set_data(b, UINT16_MAX);
+        __packet_set_data(p, UINT16_MAX);
     }
 }
 
 static inline void
-dp_packet_reset_packet(struct dp_packet *b, int off)
+dp_packet_reset_packet(struct dp_packet *p, int off)
 {
-    dp_packet_set_size(b, dp_packet_size(b) - off);
-    dp_packet_set_data(b, ((unsigned char *) dp_packet_data(b) + off));
-    dp_packet_reset_offsets(b);
+    dp_packet_set_size(p, dp_packet_size(p) - off);
+    dp_packet_set_data(p, ((unsigned char *) dp_packet_data(p) + off));
+    dp_packet_reset_offsets(p);
 }
 
 enum { NETDEV_MAX_BURST = 32 }; /* Maximum number packets in a batch. */
@@ -743,70 +743,70 @@ struct dp_packet_batch {
 };
 
 static inline void
-dp_packet_batch_init(struct dp_packet_batch *batch)
+dp_packet_batch_init(struct dp_packet_batch *b)
 {
-    batch->count = 0;
-    batch->trunc = false;
-    batch->do_not_steal = false;
+    b->count = 0;
+    b->trunc = false;
+    b->do_not_steal = false;
 }
 
 static inline void
-dp_packet_batch_add__(struct dp_packet_batch *batch,
+dp_packet_batch_add__(struct dp_packet_batch *b,
                       struct dp_packet *packet, size_t limit)
 {
-    if (batch->count < limit) {
-        batch->packets[batch->count++] = packet;
+    if (b->count < limit) {
+        b->packets[b->count++] = packet;
     } else {
         dp_packet_delete(packet);
     }
 }
 
-/* When the batch is full, 'packet' will be dropped and freed. */
+/* When the batch 'b' is full, packet 'p' will be dropped and freed. */
 static inline void
-dp_packet_batch_add(struct dp_packet_batch *batch, struct dp_packet *packet)
+dp_packet_batch_add(struct dp_packet_batch *b, struct dp_packet *p)
 {
-    dp_packet_batch_add__(batch, packet, NETDEV_MAX_BURST);
+    dp_packet_batch_add__(b, p, NETDEV_MAX_BURST);
 }
 
 static inline size_t
-dp_packet_batch_size(const struct dp_packet_batch *batch)
+dp_packet_batch_size(const struct dp_packet_batch *b)
 {
-    return batch->count;
+    return b->count;
 }
 
-/* Clear 'batch' for refill. Use dp_packet_batch_refill() to add
- * packets back into the 'batch'. */
+/* Clear batch 'b' for refill. Use dp_packet_batch_refill() to add
+ * packets back into the batch 'b'. */
 static inline void
-dp_packet_batch_refill_init(struct dp_packet_batch *batch)
+dp_packet_batch_refill_init(struct dp_packet_batch *b)
 {
-    batch->count = 0;
+    b->count = 0;
 };
 
 static inline void
-dp_packet_batch_refill(struct dp_packet_batch *batch,
+dp_packet_batch_refill(struct dp_packet_batch *b,
                        struct dp_packet *packet, size_t idx)
 {
-    dp_packet_batch_add__(batch, packet, MIN(NETDEV_MAX_BURST, idx + 1));
+    dp_packet_batch_add__(b, packet, MIN(NETDEV_MAX_BURST, idx + 1));
 }
 
 static inline void
-dp_packet_batch_init_packet(struct dp_packet_batch *batch, struct dp_packet *p)
+dp_packet_batch_init_packet(struct dp_packet_batch *b, struct dp_packet *p)
 {
-    dp_packet_batch_init(batch);
-    batch->count = 1;
-    batch->packets[0] = p;
+    dp_packet_batch_init(b);
+    b->count = 1;
+    b->packets[0] = p;
 }
 
 static inline bool
-dp_packet_batch_is_empty(const struct dp_packet_batch *batch)
+dp_packet_batch_is_empty(const struct dp_packet_batch *b)
 {
-    return !dp_packet_batch_size(batch);
+    return !dp_packet_batch_size(b);
 }
 
 static inline bool
-dp_packet_batch_is_full(const struct dp_packet_batch *batch)
+dp_packet_batch_is_full(const struct dp_packet_batch *b)
 {
-    return dp_packet_batch_size(batch) == NETDEV_MAX_BURST;
+    return dp_packet_batch_size(b) == NETDEV_MAX_BURST;
 }
 
 #define DP_PACKET_BATCH_FOR_EACH(IDX, PACKET, BATCH)                \
@@ -850,53 +850,53 @@ dp_packet_batch_clone(struct dp_packet_batch *dst,
 }
 
 static inline void
-dp_packet_delete_batch(struct dp_packet_batch *batch, bool should_steal)
+dp_packet_delete_batch(struct dp_packet_batch *b, bool should_steal)
 {
     if (should_steal) {
         struct dp_packet *packet;
 
-        DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        DP_PACKET_BATCH_FOR_EACH (i, packet, b) {
             dp_packet_delete(packet);
         }
-        dp_packet_batch_init(batch);
+        dp_packet_batch_init(b);
     }
 }
 
 static inline void
-dp_packet_batch_init_packet_fields(struct dp_packet_batch *batch)
+dp_packet_batch_init_packet_fields(struct dp_packet_batch *b)
 {
     struct dp_packet *packet;
 
-    DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+    DP_PACKET_BATCH_FOR_EACH (i, packet, b) {
         dp_packet_reset_cutlen(packet);
         packet->packet_type = htonl(PT_ETH);
     }
 }
 
 static inline void
-dp_packet_batch_apply_cutlen(struct dp_packet_batch *batch)
+dp_packet_batch_apply_cutlen(struct dp_packet_batch *b)
 {
-    if (batch->trunc) {
+    if (b->trunc) {
         struct dp_packet *packet;
 
-        DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        DP_PACKET_BATCH_FOR_EACH (i, packet, b) {
             dp_packet_set_size(packet, dp_packet_get_send_len(packet));
             dp_packet_reset_cutlen(packet);
         }
-        batch->trunc = false;
+        b->trunc = false;
     }
 }
 
 static inline void
-dp_packet_batch_reset_cutlen(struct dp_packet_batch *batch)
+dp_packet_batch_reset_cutlen(struct dp_packet_batch *b)
 {
-    if (batch->trunc) {
+    if (b->trunc) {
         struct dp_packet *packet;
 
-        DP_PACKET_BATCH_FOR_EACH (i, packet, batch) {
+        DP_PACKET_BATCH_FOR_EACH (i, packet, b) {
             dp_packet_reset_cutlen(packet);
         }
-        batch->trunc = false;
+        b->trunc = false;
     }
 }
 
@@ -947,101 +947,101 @@ dp_packet_set_flow_mark(struct dp_packet *p, uint32_t mark)
 
 /* Returns the L4 cksum offload bitmask. */
 static inline uint64_t
-dp_packet_ol_l4_mask(const struct dp_packet *b)
+dp_packet_ol_l4_mask(const struct dp_packet *p)
 {
-    return *dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK;
+    return *dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_L4_MASK;
 }
 
-/* Return true if the packet 'b' requested L4 checksum offload. */
+/* Return true if the packet 'p' requested L4 checksum offload. */
 static inline bool
-dp_packet_ol_tx_l4_csum(const struct dp_packet *b)
+dp_packet_ol_tx_l4_csum(const struct dp_packet *p)
 {
-    return !!dp_packet_ol_l4_mask(b);
+    return !!dp_packet_ol_l4_mask(p);
 }
 
-/* Returns 'true' if packet 'b' is marked for TCP segmentation offloading. */
+/* Returns 'true' if packet 'p' is marked for TCP segmentation offloading. */
 static inline bool
-dp_packet_ol_is_tso(const struct dp_packet *b)
+dp_packet_ol_is_tso(const struct dp_packet *p)
 {
-    return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_TCP_SEG);
+    return !!(*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_TCP_SEG);
 }
 
-/* Returns 'true' if packet 'b' is marked for IPv4 checksum offloading. */
+/* Returns 'true' if packet 'p' is marked for IPv4 checksum offloading. */
 static inline bool
-dp_packet_ol_is_ipv4(const struct dp_packet *b)
+dp_packet_ol_is_ipv4(const struct dp_packet *p)
 {
-    return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_IPV4);
+    return !!(*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_IPV4);
 }
 
-/* Returns 'true' if packet 'b' is marked for TCP checksum offloading. */
+/* Returns 'true' if packet 'p' is marked for TCP checksum offloading. */
 static inline bool
-dp_packet_ol_l4_is_tcp(const struct dp_packet *b)
+dp_packet_ol_l4_is_tcp(const struct dp_packet *p)
 {
-    return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
+    return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_TCP_CSUM;
 }
 
-/* Returns 'true' if packet 'b' is marked for UDP checksum offloading. */
+/* Returns 'true' if packet 'p' is marked for UDP checksum offloading. */
 static inline bool
-dp_packet_ol_l4_is_udp(struct dp_packet *b)
+dp_packet_ol_l4_is_udp(struct dp_packet *p)
 {
-    return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
+    return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_UDP_CSUM;
 }
 
-/* Returns 'true' if packet 'b' is marked for SCTP checksum offloading. */
+/* Returns 'true' if packet 'p' is marked for SCTP checksum offloading. */
 static inline bool
-dp_packet_ol_l4_is_sctp(struct dp_packet *b)
+dp_packet_ol_l4_is_sctp(struct dp_packet *p)
 {
-    return (*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_L4_MASK) ==
+    return (*dp_packet_ol_flags_ptr(p) & DP_PACKET_OL_TX_L4_MASK) ==
             DP_PACKET_OL_TX_SCTP_CSUM;
 }
 
-/* Mark packet 'b' for IPv4 checksum offloading. */
+/* Mark packet 'p' for IPv4 checksum offloading. */
 static inline void
-dp_packet_ol_set_tx_ipv4(struct dp_packet *b)
+dp_packet_ol_set_tx_ipv4(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_IPV4;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_IPV4;
 }
 
-/* Mark packet 'b' for IPv6 checksum offloading. */
+/* Mark packet 'p' for IPv6 checksum offloading. */
 static inline void
-dp_packet_ol_set_tx_ipv6(struct dp_packet *b)
+dp_packet_ol_set_tx_ipv6(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_IPV6;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_IPV6;
 }
 
-/* Mark packet 'b' for TCP checksum offloading.  It implies that either
- * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
+/* Mark packet 'p' for TCP checksum offloading.  It implies that either
+ * the packet 'p' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_ol_set_csum_tcp(struct dp_packet *b)
+dp_packet_ol_set_csum_tcp(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_CSUM;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_TCP_CSUM;
 }
 
-/* Mark packet 'b' for UDP checksum offloading.  It implies that either
- * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
+/* Mark packet 'p' for UDP checksum offloading.  It implies that either
+ * the packet 'p' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_ol_set_csum_udp(struct dp_packet *b)
+dp_packet_ol_set_csum_udp(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_UDP_CSUM;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_UDP_CSUM;
 }
 
-/* Mark packet 'b' for SCTP checksum offloading.  It implies that either
- * the packet 'b' is marked for IPv4 or IPv6 checksum offloading. */
+/* Mark packet 'p' for SCTP checksum offloading.  It implies that either
+ * the packet 'p' is marked for IPv4 or IPv6 checksum offloading. */
 static inline void
-dp_packet_ol_set_csum_sctp(struct dp_packet *b)
+dp_packet_ol_set_csum_sctp(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_SCTP_CSUM;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_SCTP_CSUM;
 }
 
-/* Mark packet 'b' for TCP segmentation offloading.  It implies that
- * either the packet 'b' is marked for IPv4 or IPv6 checksum offloading
+/* Mark packet 'p' for TCP segmentation offloading.  It implies that
+ * either the packet 'p' is marked for IPv4 or IPv6 checksum offloading
  * and also for TCP checksum offloading. */
 static inline void
-dp_packet_ol_set_tcp_seg(struct dp_packet *b)
+dp_packet_ol_set_tcp_seg(struct dp_packet *p)
 {
-    *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_SEG;
+    *dp_packet_ol_flags_ptr(p) |= DP_PACKET_OL_TX_TCP_SEG;
 }
 
 static inline bool
