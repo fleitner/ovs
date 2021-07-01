@@ -2954,7 +2954,7 @@ emc_probabilistic_insert_batch(struct dp_netdev_pmd_thread *pmd,
                                uint32_t emc_insert_mask)
 {
     while (emc_insert_mask) {
-        uint32_t i = __builtin_ctz(emc_insert_mask);
+        uint32_t i = raw_ctz(emc_insert_mask);
         emc_insert_mask &= emc_insert_mask - 1;
         /* Get the require parameters for EMC/SMC from the rule */
         struct dp_netdev_flow *flow = dp_netdev_flow_cast(rules[i]);
@@ -2970,7 +2970,7 @@ smc_insert_batch(struct dp_netdev_pmd_thread *pmd,
                  uint32_t smc_insert_mask)
 {
     while (smc_insert_mask) {
-        uint32_t i = __builtin_ctz(smc_insert_mask);
+        uint32_t i = raw_ctz(smc_insert_mask);
         smc_insert_mask &= smc_insert_mask - 1;
         /* Get the require parameters for EMC/SMC from the rule */
         struct dp_netdev_flow *flow = dp_netdev_flow_cast(rules[i]);

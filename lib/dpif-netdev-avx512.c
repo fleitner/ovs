@@ -136,14 +136,14 @@ dp_netdev_input_outer_avx512(struct dp_netdev_pmd_thread *pmd,
      * of bits set representing packets that we want to process
      * (HWOL->MFEX->EMC->SMC). As each packet is processed, we clear (set to 0)
      * the bit representing that packet using '_blsr_u64()'. The
-     * '__builtin_ctz()' will give us the correct index into the 'packets',
+     * 'raw_ctz()' will give us the correct index into the 'packets',
      * 'pkt_meta', 'keys' and 'rules' arrays.
      *
      * For one iteration of the while loop, here's some psuedocode as an
      * example where 'iter' is represented in binary:
      *
      * while (iter) { // iter = 1100
-     *     uint32_t i = __builtin_ctz(iter); // i = 2
+     *     uint32_t i = raw_ctz(iter); // i = 2
      *     iter = _blsr_u64(iter); // iter = 1000
      *     // do all processing (HWOL->MFEX->EMC->SMC)
      * }
@@ -160,7 +160,7 @@ dp_netdev_input_outer_avx512(struct dp_netdev_pmd_thread *pmd,
     uint32_t lookup_pkts_bitmask = (1ULL << batch_size) - 1;
     uint32_t iter = lookup_pkts_bitmask;
     while (iter) {
-        uint32_t i = __builtin_ctz(iter);
+        uint32_t i = raw_ctz(iter);
         iter = _blsr_u64(iter);
 
         /* Get packet pointer from bitmask and packet md. */
@@ -313,7 +313,7 @@ dp_netdev_input_outer_avx512(struct dp_netdev_pmd_thread *pmd,
     action_batch.trunc = 0;
 
     while (lookup_pkts_bitmask) {
-        uint32_t rule_pkt_idx = __builtin_ctz(lookup_pkts_bitmask);
+        uint32_t rule_pkt_idx = raw_ctz(lookup_pkts_bitmask);
         uint64_t needle = (uintptr_t) rules[rule_pkt_idx];
 
         /* Parallel compare NUM_U64_IN_ZMM_REG flow* 's to the needle, create a
@@ -350,7 +350,7 @@ dp_netdev_input_outer_avx512(struct dp_netdev_pmd_thread *pmd,
         uint16_t tcp_flags = 0;
         uint32_t bitmask_iter = batch_bitmask;
         for (int i = 0; i < action_batch.count; i++) {
-            uint32_t idx = __builtin_ctzll(bitmask_iter);
+            uint32_t idx = raw_ctz(bitmask_iter);
             bitmask_iter = _blsr_u64(bitmask_iter);
 
             bytes += pkt_meta[idx].bytes;

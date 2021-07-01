@@ -196,7 +196,7 @@ dpif_miniflow_extract_autovalidator(struct dp_packet_batch *packets,
          * classified packets in the hitmask marked by set bits. */
         while (hit_mask) {
             /* Index for the set bit. */
-            uint32_t i = __builtin_ctz(hit_mask);
+            uint32_t i = raw_ctz(hit_mask);
             /* Set the index in hitmask to Zero. */
             hit_mask &= (hit_mask - 1);
 
