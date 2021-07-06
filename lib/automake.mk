@@ -119,7 +119,6 @@ lib_libopenvswitch_la_SOURCES = \
 	lib/dpif-netdev-private-dpif.c \
 	lib/dpif-netdev-private-dpif.h \
 	lib/dpif-netdev-private-flow.h \
-	lib/dpif-netdev-private-hwol.h \
 	lib/dpif-netdev-private-thread.h \
 	lib/dpif-netdev-private.h \
 	lib/dpif-netdev-perf.c \
