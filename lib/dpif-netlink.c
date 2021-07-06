@@ -3040,8 +3040,8 @@ dpif_netlink_recv_wait_windows(struct dpif_netlink *dpif, uint32_t handler_id)
         nl_sock_wait(sock_pool[i].nl_sock, POLLIN);
     }
 }
-#endif
 
+#else
 static void
 dpif_netlink_recv_wait_vport_dispatch(struct dpif_netlink *dpif,
                                       uint32_t handler_id)
@@ -3065,6 +3065,7 @@ dpif_netlink_recv_wait_cpu_dispatch(struct dpif_netlink *dpif,
         poll_fd_wait(nl_sock_fd(handler->sock), POLLIN);
     }
 }
+#endif
 
 static void
 dpif_netlink_recv_wait(struct dpif *dpif_, uint32_t handler_id)
