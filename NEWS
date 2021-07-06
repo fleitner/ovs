@@ -25,7 +25,12 @@ Post-v2.15.0
    - ovsdb-tool:
      * New option '--election-timer' to the 'create-cluster' command to set the
        leader election timer during cluster creation.
-
+   - Per-cpu upcall dispatching:
+     * ovs-vswitchd will configure the kernel module using per-cpu dispatch
+       mode (if available). This changes the way upcalls are delivered to user
+       space in order to resolve a number of issues with per-vport dispatch.
+       The new debug appctl command `dpif-netlink/dispatch-mode`
+       will return the current dispatch mode for each datapath.
 
 v2.15.0 - 15 Feb 2021
 ---------------------
