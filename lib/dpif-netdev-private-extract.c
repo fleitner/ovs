@@ -47,6 +47,11 @@ static struct dpif_miniflow_extract_impl mfex_impls[] = {
         .probe = NULL,
         .extract_func = NULL,
         .name = "scalar", },
+
+    [MFEX_IMPL_STUDY] = {
+        .probe = NULL,
+        .extract_func = mfex_study_traffic,
+        .name = "study", },
 };
 
 BUILD_ASSERT_DECL(MFEX_IMPL_MAX >= ARRAY_SIZE(mfex_impls));
@@ -160,6 +165,18 @@ dp_mfex_impl_get_by_name(const char *name, miniflow_extract_func *out_func)
     }
 
     return -ENOENT;
+}
+
+int
+dpif_mfex_impl_info_get(struct dpif_miniflow_extract_impl **out_ptr)
+{
+    if (out_ptr == NULL) {
+        return -EINVAL;
+    }
+
+    *out_ptr = mfex_impls;
+
+    return ARRAY_SIZE(mfex_impls);
 }
 
 uint32_t
