@@ -80,13 +80,20 @@ dp_mfex_impl_get_default(void)
     /* For the first call, this will be NULL. Compute the compile time default.
      */
     if (OVS_UNLIKELY(!default_mfex_func_set)) {
+
+#ifdef MFEX_AUTOVALIDATOR_DEFAULT
+        VLOG_INFO("Default miniflow Extract implementation %s",
+                  mfex_impls[MFEX_IMPL_AUTOVALIDATOR].name);
+        atomic_store_relaxed(mfex_func, (uintptr_t) mfex_impls
+                             [MFEX_IMPL_AUTOVALIDATOR].extract_func);
+#else
         VLOG_INFO("Default MFEX implementation is %s.\n",
                   mfex_impls[MFEX_IMPL_SCALAR].name);
         atomic_store_relaxed(mfex_func, (uintptr_t) mfex_impls
                              [MFEX_IMPL_SCALAR].extract_func);
+#endif
         default_mfex_func_set = true;
     }
-
     return default_mfex_func;
 }
 
