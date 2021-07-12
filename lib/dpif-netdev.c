@@ -1076,7 +1076,7 @@ dpif_miniflow_extract_impl_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
 }
 
 static void
-dpif_miniflow_extract_impl_set(struct unixctl_conn *conn, int argc,
+dpif_miniflow_extract_impl_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
                      const char *argv[], void *aux OVS_UNUSED)
 {
     /* A First optional paramter PMD thread ID can be also provided which
